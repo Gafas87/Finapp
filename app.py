@@ -55,6 +55,92 @@ def _obtener_up_token():
     return os.environ.get("UP_BANK_TOKEN", "").strip()
 
 
+def _obtener_gemini_key():
+    try:
+        if hasattr(st, "secrets") and "gemini_api_key" in st.secrets:
+            return str(st.secrets["gemini_api_key"]).strip()
+    except Exception:
+        pass
+    return os.environ.get("GEMINI_API_KEY", "").strip()
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def _listar_modelos_gemini(api_key):
+    modelos = ["gemini-2.5-flash", "gemini-2.0-flash"]
+    try:
+        r = requests.get(
+            "https://generativelanguage.googleapis.com/v1beta/models",
+            headers={"x-goog-api-key": api_key},
+            timeout=10,
+        )
+        if r.status_code == 200:
+            encontrados = []
+            for m in r.json().get("models", []):
+                nombre = (m.get("name") or "").replace("models/", "")
+                metodos = m.get("supportedGenerationMethods", [])
+                if "generateContent" in metodos and "flash" in nombre.lower() and "image" not in nombre.lower() and "tts" not in nombre.lower():
+                    encontrados.append(nombre)
+            if encontrados:
+                # Prefer newest flash models first, keeping fallbacks
+                encontrados.sort(reverse=True)
+                return encontrados + [x for x in modelos if x not in encontrados]
+    except Exception:
+        pass
+    return modelos
+
+
+def consultar_chatbot_finanzas(pregunta, historial, contexto_financiero, api_key):
+    if not api_key:
+        return "Missing `gemini_api_key` in Streamlit Secrets. Add it under Settings → Secrets to activate the chatbot."
+
+    system_prompt = (
+        "You are Finapp AI Advisor, Julian's personal Australian finance assistant. "
+        "All amounts are in AUD unless explicitly noted. Be concise, practical, and accurate. "
+        "Use the live financial snapshot below to answer questions with exact numbers.\n\n"
+        f"{contexto_financiero}"
+    )
+
+    contents = []
+    for msg in historial[-8:]:
+        role = "user" if msg["role"] == "user" else "model"
+        contents.append({"role": role, "parts": [{"text": msg["content"]}]})
+    contents.append({"role": "user", "parts": [{"text": pregunta}]})
+
+    payload = {
+        "system_instruction": {"parts": [{"text": system_prompt}]},
+        "contents": contents,
+        "generationConfig": {"temperature": 0.3, "maxOutputTokens": 700},
+    }
+
+    ultimo_error = "Could not reach Gemini API."
+    for modelo in _listar_modelos_gemini(api_key)[:4]:
+        try:
+            resp = requests.post(
+                f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent",
+                headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
+                json=payload,
+                timeout=20,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                cands = data.get("candidates", [])
+                if cands:
+                    parts = cands[0].get("content", {}).get("parts", [])
+                    texto = "".join(p.get("text", "") for p in parts).strip()
+                    if texto:
+                        return texto
+            elif resp.status_code == 404:
+                ultimo_error = f"Model {modelo} unavailable (404)."
+                continue
+            else:
+                ultimo_error = f"Gemini API error ({resp.status_code}): {resp.text[:180]}"
+                break
+        except Exception as e:
+            ultimo_error = f"Connection error: {e}"
+            break
+    return ultimo_error
+
+
 @st.cache_data(ttl=120, show_spinner=False)
 def obtener_cuentas_up_bank(token, refresh_nonce=0):
     if not token:
@@ -243,6 +329,31 @@ def activar_interactividad_avanzada(cats_costos=None, cats_ingresos=None, ubicac
         const doc = win.document;
         const ubicacionesRecientes = __UBICACIONES_JSON__;
         const textoTooltipCantidad = __TOOLTIP_CANT_JSON__;
+
+        // 0. Float the AI Advisor popover at bottom-right of the viewport
+        function posicionarChatbotFlotante() {
+            const popovers = doc.querySelectorAll('[data-testid="stPopover"]');
+            popovers.forEach(pop => {
+                const btn = pop.querySelector('button');
+                if (btn && btn.innerText && btn.innerText.includes('AI Advisor')) {
+                    pop.style.setProperty('position', 'fixed', 'important');
+                    pop.style.setProperty('bottom', '24px', 'important');
+                    pop.style.setProperty('right', '24px', 'important');
+                    pop.style.setProperty('z-index', '9999', 'important');
+                    pop.style.setProperty('width', 'auto', 'important');
+
+                    btn.style.setProperty('border-radius', '999px', 'important');
+                    btn.style.setProperty('background', 'linear-gradient(135deg, #0C4A6E, #0284C7)', 'important');
+                    btn.style.setProperty('color', '#FFFFFF', 'important');
+                    btn.style.setProperty('border', 'none', 'important');
+                    btn.style.setProperty('padding', '12px 20px', 'important');
+                    btn.style.setProperty('box-shadow', '0 8px 24px rgba(12, 74, 110, 0.30)', 'important');
+                    btn.style.setProperty('font-weight', '700', 'important');
+                    const ps = btn.querySelectorAll('p, span');
+                    ps.forEach(el => el.style.setProperty('color', '#FFFFFF', 'important'));
+                }
+            });
+        }
 
         // 1. Style main tabs as clean pill buttons
         function estilizarSolapas() {
@@ -603,6 +714,7 @@ def activar_interactividad_avanzada(cats_costos=None, cats_ingresos=None, ubicac
         }
 
         function actualizarInterfaz() {
+            posicionarChatbotFlotante();
             estilizarSolapas();
             limpiarInputsYPopups();
             estilizarSolapasYBotonesOrden();
@@ -4094,6 +4206,99 @@ with pestana3:
                     lambda x: f"+${x:,.2f} AUD" if x >= 0 else f"-${abs(x):,.2f} AUD"
                 )
                 st.dataframe(tabla_up, use_container_width=True, hide_index=True)
+
+# =========================================================================
+# ==================== FLOATING BOTTOM-RIGHT CHATBOT ======================
+# =========================================================================
+if "finapp_chat_history" not in st.session_state:
+    st.session_state["finapp_chat_history"] = [
+        {
+            "role": "assistant",
+            "content": "Hey Julian! Ask me anything about your AUD costs, income, net worth, or Up Bank transactions."
+        }
+    ]
+
+with st.popover("💬 AI Advisor"):
+    c_ch_head, c_ch_clr = st.columns([4, 1.3])
+    c_ch_head.markdown("**💬 Finapp AI Advisor**")
+    if c_ch_clr.button("🗑️ Clear", key="chat_clear_btn", use_container_width=True):
+        st.session_state["finapp_chat_history"] = [
+            {
+                "role": "assistant",
+                "content": "Chat cleared! What would you like to check in your finances?"
+            }
+        ]
+        st.rerun()
+
+    chat_box = st.container(height=340)
+    with chat_box:
+        for msg in st.session_state["finapp_chat_history"]:
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
+
+    with st.form("finapp_floating_chat_form", clear_on_submit=True):
+        c_inp, c_send = st.columns([4, 1.2])
+        user_q = c_inp.text_input(
+            "Ask about your finances...",
+            placeholder="e.g. How much did ME Group pay me?",
+            label_visibility="collapsed",
+            key="finapp_chat_text_input",
+        )
+        submitted_q = c_send.form_submit_button("Send", type="primary", use_container_width=True)
+
+    if submitted_q and user_q.strip():
+        # Build live AUD financial snapshot for Gemini
+        costos_act = [c for c in datos.get("costos", []) if c.get("activo", True)]
+        ingresos_act = [i for i in datos.get("ingresos", []) if i.get("activo", True)]
+        tot_c = sum(c.get("monto", 0) for c in costos_act)
+        tot_i = sum(i.get("monto", 0) for i in ingresos_act)
+        resumen_ctx = [
+            f"Monthly Active Costs: ${tot_c:,.2f} AUD ({len(costos_act)} items)",
+            f"Monthly Active Income: ${tot_i:,.2f} AUD ({len(ingresos_act)} items)",
+            f"Monthly Net Savings: ${(tot_i - tot_c):,.2f} AUD",
+            "Active Costs list: " + "; ".join(f"{c.get('nombre')} (${c.get('monto', 0):,.2f}, {c.get('categoria')})" for c in costos_act[:30]),
+            "Active Income list: " + "; ".join(f"{i.get('nombre')} (${i.get('monto', 0):,.2f}, {i.get('categoria')})" for i in ingresos_act[:20]),
+        ]
+
+        inv_items = datos.get("inversiones", [])
+        if inv_items:
+            resumen_ctx.append(
+                "Net Worth / Investments entries: " + "; ".join(
+                    f"{x.get('nombre', x.get('activo', 'Asset'))} ({x.get('categoria', '')}, qty {x.get('cantidad', 0)})"
+                    for x in inv_items[:30]
+                )
+            )
+
+        up_tok = _obtener_up_token() or st.session_state.get("up_temp_token", "")
+        if up_tok:
+            cuentas_c, err_c = obtener_cuentas_up_bank(up_tok, st.session_state.get("up_refresh_nonce", 0))
+            if cuentas_c and not err_c:
+                resumen_ctx.append(
+                    "Up Bank Accounts: " + "; ".join(f"{a['name']}: ${a['balance_aud']:,.2f} AUD" for a in cuentas_c)
+                )
+            txs_c, err_t = obtener_transacciones_up_bank(up_tok, 30, st.session_state.get("up_refresh_nonce", 0))
+            if txs_c and not err_t:
+                kw_list = [k.strip() for k in datos.get("up_flatmate_keywords", "JUAN, PEPE, ADRIEN, RENT, WIFI, ELECTRICITY, WATER").split(",") if k.strip()]
+                parsed_c = [clasificar_transaccion_up(t, kw_list) for t in txs_c]
+                parsed_c = [p for p in parsed_c if not p["is_commbank_loop"] and not p["is_internal_up"]]
+                resumen_ctx.append(
+                    "Recent Up Bank Transactions (last 30d, CommBank $2k loop & internal transfers excluded): "
+                    + "; ".join(f"{p['Date'][:10]} | {p['Description']} | {p['Tag']} | ${p['Amount (AUD)']:,.2f} AUD" for p in parsed_c[:45])
+                )
+
+        gemini_k = _obtener_gemini_key()
+        with st.spinner("Thinking..."):
+            respuesta_ai = consultar_chatbot_finanzas(
+                user_q.strip(),
+                st.session_state["finapp_chat_history"],
+                "\n".join(resumen_ctx),
+                gemini_k,
+            )
+
+        st.session_state["finapp_chat_history"].append({"role": "user", "content": user_q.strip()})
+        st.session_state["finapp_chat_history"].append({"role": "assistant", "content": respuesta_ai})
+        st.rerun()
+
 
 activar_interactividad_avanzada(
     datos.get('categorias_costos', []),
