@@ -7,7 +7,7 @@ import json
 import os
 import io
 import zipfile
-import random
+import randomle
 import smtplib
 import urllib.parse
 from email.mime.text import MIMEText
@@ -409,6 +409,42 @@ def activar_interactividad_avanzada(cats_costos=None, cats_ingresos=None, ubicac
                     p.style.setProperty('gap', '8px', 'important');
                 }
             });
+
+            // Align "⇄" reorder button right next to the last main tab
+            if (tabLists.length > 0) {
+                const mainTabBtns = tabLists[0].querySelectorAll('button[data-baseweb="tab"]');
+                if (mainTabBtns.length > 0) {
+                    const lastTab = mainTabBtns[mainTabBtns.length - 1];
+                    const lastRect = lastTab.getBoundingClientRect();
+                    const popovers = doc.querySelectorAll('[data-testid="stPopover"]');
+                    popovers.forEach(pop => {
+                        const btn = pop.querySelector('button');
+                        if (btn && (btn.innerText || '').trim().includes('⇄')) {
+                            btn.style.setProperty('border-radius', '999px', 'important');
+                            btn.style.setProperty('min-height', '46px', 'important');
+                            btn.style.setProperty('height', '46px', 'important');
+                            btn.style.setProperty('padding', '0 14px', 'important');
+                            btn.style.setProperty('background', '#F9FAFB', 'important');
+                            btn.style.setProperty('border', '1.5px solid #E5E7EB', 'important');
+                            btn.style.setProperty('box-shadow', '0 2px 6px rgba(0, 0, 0, 0.04)', 'important');
+                            btn.style.setProperty('color', '#4B5563', 'important');
+                            const bp = btn.querySelector('p');
+                            if (bp) {
+                                bp.style.setProperty('font-size', '1.25rem', 'important');
+                                bp.style.setProperty('font-weight', '800', 'important');
+                                bp.style.setProperty('margin', '0', 'important');
+                            }
+                            if (lastRect.width > 0 && (lastRect.right + 76) < win.innerWidth) {
+                                pop.style.setProperty('position', 'fixed', 'important');
+                                pop.style.setProperty('top', Math.round(lastRect.top + (lastRect.height - 46) / 2) + 'px', 'important');
+                                pop.style.setProperty('left', Math.round(lastRect.right + 12) + 'px', 'important');
+                                pop.style.setProperty('z-index', '99', 'important');
+                                pop.style.setProperty('width', 'auto', 'important');
+                            }
+                        }
+                    });
+                }
+            }
         }
 
         // 2. Hide "Press Enter to apply" and shield inputs against password manager popups
@@ -2633,7 +2669,6 @@ def finalizar_sesion():
 
 with st.sidebar:
     st.markdown(f"🗓️ **{fecha_texto}**")
-    st.caption(f"🕒 {ultima_act_texto}")
     if st.button("🔄 Refresh", key="btn_sidebar_actualizar", use_container_width=True):
         st.cache_data.clear()
         for k_reset in [
@@ -2689,6 +2724,11 @@ with st.sidebar:
         registrar_snapshot_cierre(datos)
         st.session_state.confirmar_cierre = True
         st.rerun()
+
+    st.markdown(
+        f"<div style='text-align: center; color: #6B7280; font-size: 0.85rem; margin-top: 8px;'>🕒 {ultima_act_texto}</div>",
+        unsafe_allow_html=True,
+    )
 
 if st.session_state.confirmar_cierre:
     st.markdown("""
@@ -2816,9 +2856,7 @@ if (
 ):
     orden_tabs_guardado = list(DEFAULT_TAB_ORDER)
 
-col_tab_spacer, col_tab_reorder = st.columns([6, 2])
-with col_tab_reorder:
-    with st.popover("🔀 Reorder Tabs", use_container_width=True):
+with st.popover("⇄", help="Reorder tabs"):
         st.caption("Drag tabs left or right to change which tab opens first.")
         if HAS_SORTABLES:
             nuevo_orden = sort_items(
