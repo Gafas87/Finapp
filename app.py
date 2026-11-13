@@ -336,10 +336,11 @@ def activar_interactividad_avanzada(cats_costos=None, cats_ingresos=None, ubicac
             popovers.forEach(pop => {
                 const btn = pop.querySelector('button');
                 if (btn && btn.innerText && btn.innerText.includes('AI Advisor')) {
+                    const esMovil = win.innerWidth < 540;
                     pop.style.setProperty('position', 'fixed', 'important');
-                    pop.style.setProperty('bottom', '24px', 'important');
-                    pop.style.setProperty('right', '24px', 'important');
-                    pop.style.setProperty('z-index', '9999', 'important');
+                    pop.style.setProperty('bottom', esMovil ? '64px' : '14px', 'important');
+                    pop.style.setProperty('right', esMovil ? '16px' : '195px', 'important');
+                    pop.style.setProperty('z-index', '999999', 'important');
                     pop.style.setProperty('width', 'auto', 'important');
 
                     btn.style.setProperty('border-radius', '999px', 'important');
