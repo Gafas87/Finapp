@@ -30,6 +30,15 @@ st.set_page_config(
 DATA_FILE = "datos_finanzas.json"
 TZ_SYDNEY = ZoneInfo("Australia/Sydney")
 
+def _obtener_password_secreto():
+    try:
+        if hasattr(st, "secrets") and "app_password" in st.secrets:
+            return str(st.secrets["app_password"])
+    except Exception:
+        pass
+    return os.environ.get("FINAPP_PASSWORD", "")
+
+
 PALETA_PASTEL = [
     "#9B89B3",  # Pastel plum lilac
     "#F6A682",  # Pastel peach coral
@@ -1607,8 +1616,8 @@ def cargar_datos():
         "ultima_actualizacion": hoy_sydney_str,
         "seguridad": {
             "usuario": "Julian",
-            "password_actual": "salchichudo22",
-            "passwords_validas": ["salchichudo22"],
+            "password_actual": _obtener_password_secreto(),
+            "passwords_validas": [_obtener_password_secreto()] if _obtener_password_secreto() else [],
             "email_recuperacion": "julianherrero.jh@gmail.com",
             "telefono_recuperacion": "+61493680014",
             "smtp_app_password": "",
@@ -1680,11 +1689,13 @@ def cargar_datos():
 
             seg = data.get("seguridad", {})
             seg["usuario"] = "Julian"
-            seg["password_actual"] = "salchichudo22"
-            pw_val = seg.get("passwords_validas", ["salchichudo22"])
-            if "salchichudo22" not in pw_val:
-                pw_val.append("salchichudo22")
-            seg["passwords_validas"] = [p for p in pw_val if p not in ["Finanzasmama123", "terapias123"]] or ["salchichudo22"]
+            pw_sec = _obtener_password_secreto()
+            if pw_sec:
+                seg["password_actual"] = pw_sec
+            pw_val = [p for p in seg.get("passwords_validas", []) if p not in ["Finanzasmama123", "terapias123", "salchichudo22"]]
+            if pw_sec and pw_sec not in pw_val:
+                pw_val.append(pw_sec)
+            seg["passwords_validas"] = pw_val
             if not seg.get("email_recuperacion"):
                 seg["email_recuperacion"] = "julianherrero.jh@gmail.com"
             if not seg.get("telefono_recuperacion"):
@@ -3079,9 +3090,10 @@ if not st.session_state.autenticado:
             if submit:
                 seg = datos.get("seguridad", {})
                 usuario_esperado = seg.get("usuario", "Julian").strip().lower()
-                passwords_validas = seg.get("passwords_validas", ["salchichudo22"])
+                pw_sec = _obtener_password_secreto()
+                passwords_validas = seg.get("passwords_validas", [])
                 u_ok = user.strip().lower() == usuario_esperado
-                p_ok = password in passwords_validas or password == seg.get("password_actual", "salchichudo22")
+                p_ok = bool(password) and (password == pw_sec or password in passwords_validas or password == seg.get("password_actual", ""))
                 if u_ok and p_ok:
                     generar_token_sesion_7dias(datos, usuario_esperado)
                     st.session_state.autenticado = True
