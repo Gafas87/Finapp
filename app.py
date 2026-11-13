@@ -16,8 +16,14 @@ import time
 import hmac
 import hashlib
 import base64
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+
+try:
+    from streamlit_sortables import sort_items
+    HAS_SORTABLES = True
+except Exception:
+    HAS_SORTABLES = False
 from xml.sax.saxutils import escape as xml_escape
 
 st.set_page_config(
@@ -38,6 +44,134 @@ def _obtener_password_secreto():
     except Exception:
         pass
     return os.environ.get("FINAPP_PASSWORD", "")
+
+
+def _obtener_up_token():
+    try:
+        if hasattr(st, "secrets") and "up_bank_token" in st.secrets:
+            return str(st.secrets["up_bank_token"]).strip()
+    except Exception:
+        pass
+    return os.environ.get("UP_BANK_TOKEN", "").strip()
+
+
+@st.cache_data(ttl=120, show_spinner=False)
+def obtener_cuentas_up_bank(token, refresh_nonce=0):
+    if not token:
+        return [], "Missing Up Bank token"
+    try:
+        resp = requests.get(
+            "https://api.up.com.au/api/v1/accounts",
+            headers={"Authorization": f"Bearer {token}"},
+            params={"page[size]": 50},
+            timeout=12,
+        )
+        if resp.status_code == 401:
+            return [], "Invalid or expired Up Bank Personal Access Token (401 Unauthorized)."
+        if resp.status_code != 200:
+            return [], f"Up Bank API error ({resp.status_code})."
+        data = resp.json().get("data", [])
+        cuentas = []
+        for acc in data:
+            attrs = acc.get("attributes", {})
+            bal = attrs.get("balance", {})
+            cuentas.append({
+                "id": acc.get("id"),
+                "name": attrs.get("displayName", "Up Account"),
+                "type": attrs.get("accountType", "TRANSACTIONAL"),
+                "ownership": attrs.get("ownershipType", "INDIVIDUAL"),
+                "balance_aud": float(bal.get("value", 0.0)),
+            })
+        return cuentas, None
+    except Exception as e:
+        return [], f"Connection error: {e}"
+
+
+@st.cache_data(ttl=120, show_spinner=False)
+def obtener_transacciones_up_bank(token, days_back=30, refresh_nonce=0, max_pages=6):
+    if not token:
+        return [], "Missing Up Bank token"
+    try:
+        since_dt = (datetime.now(TZ_SYDNEY) - timedelta(days=int(days_back))).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
+        url = "https://api.up.com.au/api/v1/transactions"
+        params = {
+            "page[size]": 100,
+            "filter[since]": since_dt.isoformat(),
+        }
+        headers = {"Authorization": f"Bearer {token}"}
+        transacciones = []
+        paginas = 0
+        while url and paginas < max_pages:
+            resp = requests.get(url, headers=headers, params=params if paginas == 0 else None, timeout=15)
+            if resp.status_code == 401:
+                return [], "Invalid or expired Up Bank Personal Access Token (401 Unauthorized)."
+            if resp.status_code != 200:
+                return [], f"Up Bank API error ({resp.status_code})."
+            payload = resp.json()
+            transacciones.extend(payload.get("data", []))
+            url = payload.get("links", {}).get("next")
+            paginas += 1
+        return transacciones, None
+    except Exception as e:
+        return [], f"Connection error: {e}"
+
+
+def clasificar_transaccion_up(tx, flatmate_keywords=None):
+    attrs = tx.get("attributes", {})
+    rels = tx.get("relationships", {})
+    desc = (attrs.get("description") or "").strip()
+    msg = (attrs.get("message") or "").strip()
+    raw_text = (attrs.get("rawText") or "").strip()
+    combined = f"{desc} {msg} {raw_text}".upper()
+
+    amt_obj = attrs.get("amount", {})
+    amount_aud = float(amt_obj.get("value", 0.0))
+    status = attrs.get("status", "SETTLED")
+    created_raw = attrs.get("createdAt") or attrs.get("settledAt") or ""
+    try:
+        dt_syd = datetime.fromisoformat(created_raw.replace("Z", "+00:00")).astimezone(TZ_SYDNEY)
+    except Exception:
+        dt_syd = datetime.now(TZ_SYDNEY)
+
+    is_internal_up = rels.get("transferAccount", {}).get("data") is not None
+    up_cat = (rels.get("category", {}).get("data") or {}).get("id") or ""
+    is_commbank_loop = (
+        any(k in combined for k in ["COMMBANK", "COMMONWEALTH", "CBA"])
+        and abs(abs(amount_aud) - 2000.0) <= 5.0
+    )
+
+    if is_commbank_loop:
+        tag = "🔁 CommBank $2k Loop"
+    elif is_internal_up:
+        tag = "🔄 Internal Up Transfer"
+    elif amount_aud > 0:
+        if any(k in combined for k in ["ME GROUP", "CG RECRUITMENT", "PINNACLE", "PARKHOUNT"]):
+            tag = "💼 Wages / Salary"
+        elif flatmate_keywords and any(k.strip().upper() in combined for k in flatmate_keywords if k.strip()):
+            tag = "🏠 Flatmates / Bills"
+        elif any(k in combined for k in ["RENT", "WIFI", "ELECTRIC", "WATER", "BILLS"]):
+            tag = "🏠 Flatmates / Bills"
+        else:
+            tag = "💵 Other Income"
+    else:
+        if up_cat:
+            tag = f"💳 {up_cat.replace('-', ' ').title()}"
+        else:
+            tag = "💳 Everyday Expense"
+
+    return {
+        "Date": dt_syd.strftime("%Y-%m-%d %H:%M"),
+        "Date_Sort": dt_syd,
+        "Description": desc or "Transaction",
+        "Note": msg,
+        "Tag": tag,
+        "Status": status,
+        "Amount (AUD)": amount_aud,
+        "is_commbank_loop": is_commbank_loop,
+        "is_internal_up": is_internal_up,
+    }
 
 
 PALETA_PASTEL = [
@@ -2556,12 +2690,56 @@ def mover_categoria_ingreso(idx_actual, direccion):
         guardar_datos(datos)
 
 
-# ----------------- MAIN TABS -----------------
-pestana1, pestana2, pestana3 = st.tabs([
+# ----------------- MAIN TABS (REORDERABLE) -----------------
+DEFAULT_TAB_ORDER = [
     "📊 COSTS & INCOME",
     "💼 TOTAL NET WORTH",
     "⚡ LIVE CASH FLOW"
-])
+]
+
+orden_tabs_guardado = datos.get("tab_order", DEFAULT_TAB_ORDER)
+if (
+    not isinstance(orden_tabs_guardado, list)
+    or set(orden_tabs_guardado) != set(DEFAULT_TAB_ORDER)
+    or len(orden_tabs_guardado) != len(DEFAULT_TAB_ORDER)
+):
+    orden_tabs_guardado = list(DEFAULT_TAB_ORDER)
+
+col_tab_spacer, col_tab_reorder = st.columns([6, 2])
+with col_tab_reorder:
+    with st.popover("🔀 Reorder Tabs", use_container_width=True):
+        st.caption("Drag tabs left or right to change which tab opens first.")
+        if HAS_SORTABLES:
+            nuevo_orden = sort_items(
+                list(orden_tabs_guardado),
+                direction="horizontal",
+                key="finapp_drag_tab_order"
+            )
+            if nuevo_orden and nuevo_orden != orden_tabs_guardado and set(nuevo_orden) == set(DEFAULT_TAB_ORDER):
+                datos["tab_order"] = nuevo_orden
+                guardar_datos(datos, registrar_cambio=False)
+                st.rerun()
+        else:
+            st.caption("Add `streamlit-sortables` to `requirements.txt` for drag-and-drop, or use the arrows below:")
+            for idx_t, t_lbl in enumerate(orden_tabs_guardado):
+                c_tl, c_tu, c_td = st.columns([5, 1.5, 1.5])
+                c_tl.markdown(f"**{t_lbl}**")
+                if c_tu.button("◀", key=f"tab_left_{idx_t}", disabled=(idx_t == 0)):
+                    orden_tabs_guardado[idx_t - 1], orden_tabs_guardado[idx_t] = orden_tabs_guardado[idx_t], orden_tabs_guardado[idx_t - 1]
+                    datos["tab_order"] = orden_tabs_guardado
+                    guardar_datos(datos, registrar_cambio=False)
+                    st.rerun()
+                if c_td.button("▶", key=f"tab_right_{idx_t}", disabled=(idx_t == len(orden_tabs_guardado) - 1)):
+                    orden_tabs_guardado[idx_t + 1], orden_tabs_guardado[idx_t] = orden_tabs_guardado[idx_t], orden_tabs_guardado[idx_t + 1]
+                    datos["tab_order"] = orden_tabs_guardado
+                    guardar_datos(datos, registrar_cambio=False)
+                    st.rerun()
+
+tabs_creadas = st.tabs(orden_tabs_guardado)
+mapa_tabs = dict(zip(orden_tabs_guardado, tabs_creadas))
+pestana1 = mapa_tabs["📊 COSTS & INCOME"]
+pestana2 = mapa_tabs["💼 TOTAL NET WORTH"]
+pestana3 = mapa_tabs["⚡ LIVE CASH FLOW"]
 
 # =========================================================================
 # ============================= TAB 1 =====================================
@@ -3758,12 +3936,164 @@ with pestana2:
 # ============================= TAB 3 =====================================
 # =========================================================================
 with pestana3:
-    st.markdown("<h3 style='color: #0C4A6E;'>⚡ Live Cash Flow (Bank Sync)</h3>", unsafe_allow_html=True)
-    st.info(
-        "Ready for your live **Up Bank** connection! In the next step, we'll connect your "
-        "Personal Access Token here so every tap-and-pay expense and salary deposit (ME Group, "
-        "CG Recruitment, Pinnacle People, Parkhount, and flatmate rent/bills) loads automatically in AUD."
-    )
+    st.markdown("<h3 style='color: #0C4A6E;'>⚡ Live Cash Flow — Up Bank</h3>", unsafe_allow_html=True)
+
+    if "up_refresh_nonce" not in st.session_state:
+        st.session_state["up_refresh_nonce"] = 0
+    if "up_temp_token" not in st.session_state:
+        st.session_state["up_temp_token"] = ""
+
+    up_token_secreto = _obtener_up_token()
+    up_token_activo = up_token_secreto or st.session_state["up_temp_token"]
+
+    if not up_token_activo:
+        st.info(
+            "Connect your **Up Bank** account to stream live AUD balances, tap-and-pay expenses, "
+            "and income deposits (**ME Group**, **CG Recruitment**, **Pinnacle People**, **Parkhount**, and flatmates)."
+        )
+        with st.expander("🔑 How to connect your Up Bank Personal Access Token", expanded=True):
+            st.markdown(
+                "1. Open the **Up** app on your phone, swipe right, and select **Data sharing**.\n"
+                "2. Tap **Personal Access Token** → **Generate a token** (or visit `https://api.up.com.au/getting_started`).\n"
+                "3. Copy the token (`up:yeah:...`) and add it to **Streamlit Cloud → App Settings → Secrets** as:\n"
+                "```toml\nup_bank_token = \"up:yeah:your_token_here\"\n```"
+            )
+            temp_tok = st.text_input(
+                "Or paste your token here to test right now (session only, not saved to GitHub):",
+                type="password",
+                key="up_token_temp_input",
+            )
+            if st.button("🔌 Connect Up Bank", type="primary"):
+                if temp_tok.strip():
+                    st.session_state["up_temp_token"] = temp_tok.strip()
+                    st.rerun()
+                else:
+                    st.warning("Paste your `up:yeah:...` token first.")
+    else:
+        c_ctrl1, c_ctrl2, c_ctrl3, c_ctrl4 = st.columns([1.8, 1.8, 2.2, 1.2])
+        with c_ctrl1:
+            dias_ventana = st.selectbox(
+                "📅 Period",
+                options=[7, 14, 30, 60, 90],
+                index=2,
+                format_func=lambda d: f"Last {d} days",
+                key="up_days_window",
+            )
+        with c_ctrl2:
+            flatmate_kw_str = st.text_input(
+                "🏠 Flatmate / Rent keywords (comma-separated)",
+                value=datos.get("up_flatmate_keywords", "JUAN, PEPE, ADRIEN, RENT, WIFI, ELECTRICITY, WATER"),
+                key="up_flatmate_kw_input",
+            )
+            if flatmate_kw_str != datos.get("up_flatmate_keywords", ""):
+                datos["up_flatmate_keywords"] = flatmate_kw_str
+                guardar_datos(datos, registrar_cambio=False)
+        with c_ctrl3:
+            st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
+            ocultar_loop_cba = st.checkbox("Hide CommBank $2k loop", value=True, key="up_hide_cba_loop")
+            ocultar_internas_up = st.checkbox("Hide internal Up Saver transfers", value=True, key="up_hide_internal")
+        with c_ctrl4:
+            st.markdown("<div style='height: 22px;'></div>", unsafe_allow_html=True)
+            if st.button("🔄 Sync Now", use_container_width=True, key="up_sync_btn"):
+                st.session_state["up_refresh_nonce"] += 1
+                st.rerun()
+
+        cuentas_up, err_cuentas = obtener_cuentas_up_bank(
+            up_token_activo, st.session_state["up_refresh_nonce"]
+        )
+        txs_raw, err_txs = obtener_transacciones_up_bank(
+            up_token_activo, dias_ventana, st.session_state["up_refresh_nonce"]
+        )
+
+        if err_cuentas or err_txs:
+            st.error(err_cuentas or err_txs)
+            if not up_token_secreto and st.button("Clear temporary token"):
+                st.session_state["up_temp_token"] = ""
+                st.rerun()
+        else:
+            # 1. Live Up Account Balances
+            if cuentas_up:
+                total_up_aud = sum(c["balance_aud"] for c in cuentas_up)
+                cols_acc = st.columns(min(len(cuentas_up) + 1, 5))
+                cols_acc[0].metric("🏦 Total Up Balance", f"${total_up_aud:,.2f} AUD")
+                for idx_acc, acc in enumerate(cuentas_up[:4]):
+                    cols_acc[idx_acc + 1].metric(acc["name"], f"${acc['balance_aud']:,.2f} AUD")
+
+            flatmate_kws = [k.strip() for k in flatmate_kw_str.split(",") if k.strip()]
+            filas_tx = [clasificar_transaccion_up(tx, flatmate_kws) for tx in txs_raw]
+            df_up = pd.DataFrame(filas_tx)
+
+            if df_up.empty:
+                st.info(f"No Up Bank transactions found in the last {dias_ventana} days.")
+            else:
+                df_filtrado = df_up.copy()
+                if ocultar_loop_cba:
+                    df_filtrado = df_filtrado[~df_filtrado["is_commbank_loop"]]
+                if ocultar_internas_up:
+                    df_filtrado = df_filtrado[~df_filtrado["is_internal_up"]]
+
+                incomes_aud = df_filtrado[df_filtrado["Amount (AUD)"] > 0]["Amount (AUD)"].sum()
+                expenses_aud = abs(df_filtrado[df_filtrado["Amount (AUD)"] < 0]["Amount (AUD)"].sum())
+                net_aud = incomes_aud - expenses_aud
+
+                k1, k2, k3 = st.columns(3)
+                k1.markdown(
+                    f'<div class="metric-card metric-card-ingresos"><h4>Live Income ({dias_ventana}d)</h4>'
+                    f'<div class="valor-principal">${incomes_aud:,.2f} AUD</div>'
+                    f'<div class="subtexto">Wages, flatmates & deposits</div></div>',
+                    unsafe_allow_html=True,
+                )
+                k2.markdown(
+                    f'<div class="metric-card metric-card-costos"><h4>Live Expenses ({dias_ventana}d)</h4>'
+                    f'<div class="valor-principal">${expenses_aud:,.2f} AUD</div>'
+                    f'<div class="subtexto">Tap-and-pay & outgoing</div></div>',
+                    unsafe_allow_html=True,
+                )
+                clase_net = "metric-card-lila" if net_aud >= 0 else "metric-card-neutro"
+                k3.markdown(
+                    f'<div class="metric-card {clase_net}"><h4>Net Cash Flow ({dias_ventana}d)</h4>'
+                    f'<div class="valor-principal">${net_aud:,.2f} AUD</div>'
+                    f'<div class="subtexto">Filtered live balance</div></div>',
+                    unsafe_allow_html=True,
+                )
+
+                st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+
+                # Breakdown Charts
+                c_ch1, c_ch2 = st.columns(2)
+                with c_ch1:
+                    df_in = df_filtrado[df_filtrado["Amount (AUD)"] > 0]
+                    if not df_in.empty:
+                        grp_in = df_in.groupby("Tag", as_index=False)["Amount (AUD)"].sum()
+                        fig_in = crear_torta_2d(grp_in, "Amount (AUD)", "Tag")
+                        st.markdown("**💵 Income by Source**")
+                        st.plotly_chart(fig_in, use_container_width=True, config={"displayModeBar": False})
+                with c_ch2:
+                    df_out = df_filtrado[df_filtrado["Amount (AUD)"] < 0].copy()
+                    if not df_out.empty:
+                        df_out["Spent (AUD)"] = df_out["Amount (AUD)"].abs()
+                        grp_out = df_out.groupby("Tag", as_index=False)["Spent (AUD)"].sum()
+                        fig_out = crear_torta_2d(grp_out, "Spent (AUD)", "Tag")
+                        st.markdown("**💳 Expenses by Category**")
+                        st.plotly_chart(fig_out, use_container_width=True, config={"displayModeBar": False})
+
+                # Searchable Transaction Table
+                f_txt = st.text_input("🔎 Search transactions (e.g. ME Group, Coles, Woolworths):", key="up_search_tx")
+                df_show = df_filtrado.copy()
+                if f_txt.strip():
+                    q_low = f_txt.strip().lower()
+                    df_show = df_show[
+                        df_show["Description"].str.lower().str.contains(q_low, na=False)
+                        | df_show["Note"].str.lower().str.contains(q_low, na=False)
+                        | df_show["Tag"].str.lower().str.contains(q_low, na=False)
+                    ]
+
+                df_show = df_show.sort_values("Date_Sort", ascending=False)
+                tabla_up = df_show[["Date", "Description", "Tag", "Status", "Note", "Amount (AUD)"]].copy()
+                tabla_up["Amount (AUD)"] = tabla_up["Amount (AUD)"].apply(
+                    lambda x: f"+${x:,.2f} AUD" if x >= 0 else f"-${abs(x):,.2f} AUD"
+                )
+                st.dataframe(tabla_up, use_container_width=True, hide_index=True)
 
 activar_interactividad_avanzada(
     datos.get('categorias_costos', []),
