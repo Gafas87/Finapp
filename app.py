@@ -174,18 +174,17 @@ def obtener_cuentas_up_bank(token, refresh_nonce=0):
 
 
 @st.cache_data(ttl=120, show_spinner=False)
-def obtener_transacciones_up_bank(token, days_back=30, refresh_nonce=0, max_pages=6):
+def obtener_transacciones_up_bank(token, days_back=30, refresh_nonce=0, max_pages=20):
     if not token:
         return [], "Missing Up Bank token"
     try:
-        since_dt = (datetime.now(TZ_SYDNEY) - timedelta(days=int(days_back))).replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
         url = "https://api.up.com.au/api/v1/transactions"
-        params = {
-            "page[size]": 100,
-            "filter[since]": since_dt.isoformat(),
-        }
+        params = {"page[size]": 100}
+        if days_back is not None:
+            since_dt = (datetime.now(TZ_SYDNEY) - timedelta(days=int(days_back))).replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
+            params["filter[since]"] = since_dt.isoformat()
         headers = {"Authorization": f"Bearer {token}"}
         transacciones = []
         paginas = 0
@@ -336,10 +335,9 @@ def activar_interactividad_avanzada(cats_costos=None, cats_ingresos=None, ubicac
             popovers.forEach(pop => {
                 const btn = pop.querySelector('button');
                 if (btn && btn.innerText && btn.innerText.includes('AI Advisor')) {
-                    const esMovil = win.innerWidth < 540;
                     pop.style.setProperty('position', 'fixed', 'important');
-                    pop.style.setProperty('bottom', esMovil ? '64px' : '14px', 'important');
-                    pop.style.setProperty('right', esMovil ? '16px' : '195px', 'important');
+                    pop.style.setProperty('bottom', '62px', 'important');
+                    pop.style.setProperty('right', '20px', 'important');
                     pop.style.setProperty('z-index', '999999', 'important');
                     pop.style.setProperty('width', 'auto', 'important');
 
@@ -4049,7 +4047,6 @@ with pestana2:
 # ============================= TAB 3 =====================================
 # =========================================================================
 with pestana3:
-    st.markdown("<h3 style='color: #0C4A6E;'>⚡ Live Cash Flow — Up Bank</h3>", unsafe_allow_html=True)
 
     if "up_refresh_nonce" not in st.session_state:
         st.session_state["up_refresh_nonce"] = 0
@@ -4083,33 +4080,57 @@ with pestana3:
                 else:
                     st.warning("Paste your `up:yeah:...` token first.")
     else:
-        c_ctrl1, c_ctrl2, c_ctrl3, c_ctrl4 = st.columns([1.8, 1.8, 2.2, 1.2])
+        PERIOD_OPTIONS = [
+            (7, "Last week"),
+            (30, "Last month"),
+            (90, "Last quarter"),
+            (180, "Last 6 months"),
+            (365, "Last year"),
+            (None, "All time"),
+        ]
+        if "up_hide_cba_loop" not in st.session_state:
+            st.session_state["up_hide_cba_loop"] = True
+        if "up_hide_internal" not in st.session_state:
+            st.session_state["up_hide_internal"] = True
+
+        n_activos = int(bool(st.session_state["up_hide_cba_loop"])) + int(bool(st.session_state["up_hide_internal"]))
+        etiqueta_filtros = f"{n_activos} active" if n_activos > 0 else "None active"
+
+        c_ctrl1, c_ctrl2, c_ctrl_sp = st.columns([2.2, 2.2, 4.6])
         with c_ctrl1:
-            dias_ventana = st.selectbox(
+            periodo_sel = st.selectbox(
                 "📅 Period",
-                options=[7, 14, 30, 60, 90],
-                index=2,
-                format_func=lambda d: f"Last {d} days",
+                options=PERIOD_OPTIONS,
+                index=1,
+                format_func=lambda p: p[1],
                 key="up_days_window",
             )
+            dias_ventana, etiqueta_periodo = periodo_sel
         with c_ctrl2:
-            flatmate_kw_str = st.text_input(
-                "🏠 Flatmate / Rent keywords (comma-separated)",
-                value=datos.get("up_flatmate_keywords", "JUAN, PEPE, ADRIEN, RENT, WIFI, ELECTRICITY, WATER"),
-                key="up_flatmate_kw_input",
+            st.markdown(
+                "<div style='font-size: 0.875rem; line-height: 1.6; margin-bottom: 4px;'>⚙️ Filters</div>",
+                unsafe_allow_html=True,
             )
-            if flatmate_kw_str != datos.get("up_flatmate_keywords", ""):
-                datos["up_flatmate_keywords"] = flatmate_kw_str
-                guardar_datos(datos, registrar_cambio=False)
-        with c_ctrl3:
-            st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
-            ocultar_loop_cba = st.checkbox("Hide CommBank $2k loop", value=True, key="up_hide_cba_loop")
-            ocultar_internas_up = st.checkbox("Hide internal Up Saver transfers", value=True, key="up_hide_internal")
-        with c_ctrl4:
-            st.markdown("<div style='height: 22px;'></div>", unsafe_allow_html=True)
-            if st.button("🔄 Sync Now", use_container_width=True, key="up_sync_btn"):
-                st.session_state["up_refresh_nonce"] += 1
-                st.rerun()
+            with st.popover(etiqueta_filtros, use_container_width=True):
+                ocultar_loop_cba = st.checkbox(
+                    "Hide CommBank $2k loop",
+                    help="Excludes the $2,000 AUD CommBank fee-waiver transfers so they don't inflate income/expenses.",
+                    key="up_hide_cba_loop",
+                )
+                ocultar_internas_up = st.checkbox(
+                    "Hide internal Up Saver transfers",
+                    help="Excludes transfers between your own Up Spending and Saver accounts.",
+                    key="up_hide_internal",
+                )
+                flatmate_kw_str = st.text_input(
+                    "🏠 Flatmate / Rent keywords",
+                    value=datos.get("up_flatmate_keywords", "JUAN, PEPE, ADRIEN, RENT, WIFI, ELECTRICITY, WATER"),
+                    help="Incoming deposits matching these words are tagged as Flatmates / Bills.",
+                    key="up_flatmate_kw_input",
+                )
+                if flatmate_kw_str != datos.get("up_flatmate_keywords", ""):
+                    datos["up_flatmate_keywords"] = flatmate_kw_str
+                    guardar_datos(datos, registrar_cambio=False)
 
         cuentas_up, err_cuentas = obtener_cuentas_up_bank(
             up_token_activo, st.session_state["up_refresh_nonce"]
@@ -4137,7 +4158,7 @@ with pestana3:
             df_up = pd.DataFrame(filas_tx)
 
             if df_up.empty:
-                st.info(f"No Up Bank transactions found in the last {dias_ventana} days.")
+                st.info(f"No Up Bank transactions found for: {etiqueta_periodo}.")
             else:
                 df_filtrado = df_up.copy()
                 if ocultar_loop_cba:
@@ -4151,20 +4172,20 @@ with pestana3:
 
                 k1, k2, k3 = st.columns(3)
                 k1.markdown(
-                    f'<div class="metric-card metric-card-ingresos"><h4>Live Income ({dias_ventana}d)</h4>'
+                    f'<div class="metric-card metric-card-ingresos"><h4>Live Income ({etiqueta_periodo})</h4>'
                     f'<div class="valor-principal">${incomes_aud:,.2f} AUD</div>'
                     f'<div class="subtexto">Wages, flatmates & deposits</div></div>',
                     unsafe_allow_html=True,
                 )
                 k2.markdown(
-                    f'<div class="metric-card metric-card-costos"><h4>Live Expenses ({dias_ventana}d)</h4>'
+                    f'<div class="metric-card metric-card-costos"><h4>Live Expenses ({etiqueta_periodo})</h4>'
                     f'<div class="valor-principal">${expenses_aud:,.2f} AUD</div>'
                     f'<div class="subtexto">Tap-and-pay & outgoing</div></div>',
                     unsafe_allow_html=True,
                 )
                 clase_net = "metric-card-lila" if net_aud >= 0 else "metric-card-neutro"
                 k3.markdown(
-                    f'<div class="metric-card {clase_net}"><h4>Net Cash Flow ({dias_ventana}d)</h4>'
+                    f'<div class="metric-card {clase_net}"><h4>Net Cash Flow ({etiqueta_periodo})</h4>'
                     f'<div class="valor-principal">${net_aud:,.2f} AUD</div>'
                     f'<div class="subtexto">Filtered live balance</div></div>',
                     unsafe_allow_html=True,
