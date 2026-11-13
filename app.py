@@ -16,19 +16,20 @@ import time
 import hmac
 import hashlib
 import base64
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 from zoneinfo import ZoneInfo
 from xml.sax.saxutils import escape as xml_escape
 
 st.set_page_config(
     page_title="Finapp",
     layout="wide",
-    page_icon="🌿",
+    page_icon="💳",
     initial_sidebar_state="expanded"
 )
 
 DATA_FILE = "datos_finanzas.json"
 TZ_SYDNEY = ZoneInfo("Australia/Sydney")
+
 
 def _obtener_password_secreto():
     try:
@@ -57,10 +58,10 @@ PALETA_PASTEL = [
 ICONOS_DISPONIBLES = [
     "🧾", "💡", "🚗", "👗", "🏠", "🛒", "🩺", "🏊‍♀️", "🧘‍♀️", "✈️",
     "📺", "🐾", "📚", "🎁", "💳", "💼", "💵", "👵", "📈", "📁",
-    "🌿", "💎", "🛠️", "🧹", "🍽️", "📱", "⛽", "📌",
-    "🔨", "🧰", "🖌️", "🌱", "🐜", "🚚", "🔑", "🛋️", "🛏️", "🖼️",
+    "💎", "🛠️", "🧹", "🍽️", "📱", "⛽", "📌",
+    "🔨", "🧰", "🖌️", "🐜", "🚚", "🔑", "🛋️", "🛏️", "🖼️",
     "🧺", "🚨", "🚿", "❄️", "🌡️", "☀️", "🍎", "🥩", "🥖", "☕",
-    "🧴", "🫧", "👕", "🧻", "🧽", "🪥", "🧼", "🌸", "🚆", "🚕",
+    "🧴", "🫧", "👕", "🧻", "🧽", "🪥", "🧼", "🚆", "🚕",
     "🏍️", "🛡️", "📋", "🔧", "🛞", "🅿️", "🏥", "🦷", "💊", "🧪",
     "🩻", "👓", "🦵", "🧠", "🥗", "🧥", "🕶️", "⌚", "🪡", "🎒",
     "💍", "💰", "🏦", "🪙", "📊", "🎓", "🎭", "🐶", "🐱"
@@ -109,8 +110,8 @@ def activar_interactividad_avanzada(cats_costos=None, cats_ingresos=None, ubicac
         const ubicacionesRecientes = __UBICACIONES_JSON__;
         const textoTooltipCantidad = __TOOLTIP_CANT_JSON__;
 
-        // 1. Style main tabs with 🍀 and remove default bottom highlight line
-        function estilizarTrebolesSolapas() {
+        // 1. Style main tabs as clean pill buttons
+        function estilizarSolapas() {
             const highlights = doc.querySelectorAll('[data-baseweb="tab-highlight"], [data-baseweb="tab-border"]');
             highlights.forEach(el => {
                 el.style.setProperty('display', 'none', 'important');
@@ -123,10 +124,10 @@ def activar_interactividad_avanzada(cats_costos=None, cats_ingresos=None, ubicac
             const tabLists = doc.querySelectorAll('[data-baseweb="tab-list"]');
             tabLists.forEach(tl => {
                 tl.style.setProperty('height', 'auto', 'important');
-                tl.style.setProperty('min-height', '72px', 'important');
+                tl.style.setProperty('min-height', '68px', 'important');
                 tl.style.setProperty('overflow', 'visible', 'important');
                 tl.style.setProperty('padding', '8px 4px', 'important');
-                tl.style.setProperty('gap', '16px', 'important');
+                tl.style.setProperty('gap', '14px', 'important');
                 tl.style.setProperty('align-items', 'center', 'important');
                 tl.style.setProperty('border', 'none', 'important');
             });
@@ -135,48 +136,33 @@ def activar_interactividad_avanzada(cats_costos=None, cats_ingresos=None, ubicac
             tabs.forEach(tab => {
                 const isSelected = tab.getAttribute('aria-selected') === 'true';
                 tab.style.setProperty('border-radius', '999px', 'important');
-                tab.style.setProperty('min-height', '58px', 'important');
+                tab.style.setProperty('min-height', '54px', 'important');
                 tab.style.setProperty('height', 'auto', 'important');
-                tab.style.setProperty('padding', '12px 32px', 'important');
+                tab.style.setProperty('padding', '10px 26px', 'important');
                 tab.style.setProperty('transition', 'all 0.25s ease-in-out', 'important');
                 tab.style.setProperty('overflow', 'visible', 'important');
 
                 if (isSelected) {
-                    tab.style.setProperty('background', '#E6F7EF', 'important');
-                    tab.style.setProperty('background-color', '#E6F7EF', 'important');
-                    tab.style.setProperty('border', '2px solid #A8DFC4', 'important');
-                    tab.style.setProperty('box-shadow', '0 4px 14px rgba(45, 106, 79, 0.14)', 'important');
+                    tab.style.setProperty('background', '#E0F2FE', 'important');
+                    tab.style.setProperty('background-color', '#E0F2FE', 'important');
+                    tab.style.setProperty('border', '2px solid #7DD3FC', 'important');
+                    tab.style.setProperty('box-shadow', '0 4px 14px rgba(14, 116, 144, 0.14)', 'important');
                 } else {
                     tab.style.setProperty('background', '#F9FAFB', 'important');
                     tab.style.setProperty('background-color', '#F9FAFB', 'important');
-                    tab.style.setProperty('border', '1.5px solid #D8ECE3', 'important');
+                    tab.style.setProperty('border', '1.5px solid #E5E7EB', 'important');
                     tab.style.setProperty('box-shadow', '0 2px 6px rgba(0, 0, 0, 0.04)', 'important');
                 }
 
                 const p = tab.querySelector('[data-testid="stMarkdownContainer"] p') || tab.querySelector('p');
                 if (p) {
-                    p.style.setProperty('font-size', '1.22rem', 'important');
+                    p.style.setProperty('font-size', '1.12rem', 'important');
                     p.style.setProperty('font-weight', '800', 'important');
-                    p.style.setProperty('color', isSelected ? '#1B4332' : '#4B5563', 'important');
+                    p.style.setProperty('color', isSelected ? '#0C4A6E' : '#4B5563', 'important');
                     p.style.setProperty('margin', '0px', 'important');
                     p.style.setProperty('display', 'inline-flex', 'important');
                     p.style.setProperty('align-items', 'center', 'important');
                     p.style.setProperty('gap', '8px', 'important');
-
-                    let spanClover = p.querySelector('.trebol-tab-icon');
-                    if (!spanClover && (p.textContent || '').includes('🍀')) {
-                        const textoLimpio = (p.textContent || '').replace('🍀', '').trim();
-                        p.innerHTML = '<span class="trebol-tab-icon">🍀</span><span>' + textoLimpio + '</span>';
-                        spanClover = p.querySelector('.trebol-tab-icon');
-                    }
-                    if (spanClover) {
-                        spanClover.style.setProperty('font-size', '1.3em', 'important');
-                        spanClover.style.setProperty('line-height', '1', 'important');
-                        spanClover.style.setProperty('vertical-align', 'middle', 'important');
-                        spanClover.style.setProperty('display', 'inline-block', 'important');
-                        spanClover.style.setProperty('transition', 'opacity 0.25s ease', 'important');
-                        spanClover.style.setProperty('opacity', isSelected ? '1' : '0.5', 'important');
-                    }
                 }
             });
         }
@@ -310,9 +296,9 @@ def activar_interactividad_avanzada(cats_costos=None, cats_ingresos=None, ubicac
                 } else if (t === '+') {
                     btn.classList.add('btn-mas-trebol');
                     btn.setAttribute('title', 'Add category');
-                    btn.style.setProperty('background', '#57CC99', 'important');
-                    btn.style.setProperty('background-color', '#57CC99', 'important');
-                    btn.style.setProperty('border', '1.5px solid #38A3A5', 'important');
+                    btn.style.setProperty('background', '#38BDF8', 'important');
+                    btn.style.setProperty('background-color', '#38BDF8', 'important');
+                    btn.style.setProperty('border', '1.5px solid #0284C7', 'important');
                     btn.style.setProperty('color', '#FFFFFF', 'important');
                     btn.style.setProperty('width', '38px', 'important');
                     btn.style.setProperty('min-width', '38px', 'important');
@@ -442,7 +428,7 @@ def activar_interactividad_avanzada(cats_costos=None, cats_ingresos=None, ubicac
             });
         }
 
-        // 5. Tooltip on "3. Quantity Held" & green Refresh button in sidebar
+        // 5. Tooltip on "3. Quantity Held" & clean Refresh button in sidebar
         function configurarTooltipCantidadYBotones() {
             const oldMenu = doc.getElementById('jardin-ubicacion-dropdown');
             if (oldMenu) oldMenu.remove();
@@ -467,14 +453,14 @@ def activar_interactividad_avanzada(cats_costos=None, cats_ingresos=None, ubicac
                 sidebar.querySelectorAll('button').forEach(btn => {
                     const txt = (btn.innerText || btn.textContent || '').trim();
                     if (txt.includes('Refresh')) {
-                        btn.style.setProperty('background', '#D8F3DC', 'important');
-                        btn.style.setProperty('background-color', '#D8F3DC', 'important');
-                        btn.style.setProperty('border', '1.5px solid #74C69D', 'important');
-                        btn.style.setProperty('color', '#1B4332', 'important');
+                        btn.style.setProperty('background', '#E0F2FE', 'important');
+                        btn.style.setProperty('background-color', '#E0F2FE', 'important');
+                        btn.style.setProperty('border', '1.5px solid #7DD3FC', 'important');
+                        btn.style.setProperty('color', '#0C4A6E', 'important');
                         btn.style.setProperty('font-weight', '700', 'important');
                         btn.style.setProperty('border-radius', '12px', 'important');
                         btn.querySelectorAll('p, span, div').forEach(ch => {
-                            ch.style.setProperty('color', '#1B4332', 'important');
+                            ch.style.setProperty('color', '#0C4A6E', 'important');
                             ch.style.setProperty('font-weight', '700', 'important');
                         });
                     }
@@ -483,7 +469,7 @@ def activar_interactividad_avanzada(cats_costos=None, cats_ingresos=None, ubicac
         }
 
         function actualizarInterfaz() {
-            estilizarTrebolesSolapas();
+            estilizarSolapas();
             limpiarInputsYPopups();
             estilizarSolapasYBotonesOrden();
             asegurarLineasConectorasTortas();
@@ -524,7 +510,7 @@ def activar_interactividad_avanzada(cats_costos=None, cats_ingresos=None, ubicac
         }, { capture: true, signal: sig });
 
         doc.addEventListener('click', function() {
-            setTimeout(estilizarTrebolesSolapas, 30);
+            setTimeout(estilizarSolapas, 30);
         }, { capture: true, signal: sig });
 
         let timerObs = null;
@@ -549,7 +535,7 @@ def activar_interactividad_avanzada(cats_costos=None, cats_ingresos=None, ubicac
     components.html(js_final, height=0, width=0)
 
 
-# ----------------- 3D DYNAMIC FINANCIAL HEALTH PANEL -----------------
+# ----------------- FINANCIAL HEALTH SUMMARY CARD (AUD ONLY) -----------------
 def _hex_to_rgb(h):
     h = h.lstrip("#")
     return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
@@ -571,7 +557,6 @@ def _lerp_color(c1, c2, t):
 
 
 def _multi_color(stops, score):
-    """Continuously interpolates between a list of (pos, '#RRGGBB') tuples."""
     s = max(0.0, min(1.0, float(score)))
     for i in range(len(stops) - 1):
         p0, c0 = stops[i]
@@ -582,326 +567,35 @@ def _multi_color(stops, score):
     return stops[-1][1]
 
 
-def _construir_svg_canguro(score):
-    """Builds the 3D kangaroo SVG: skeleton with flies at score=0, tired/sad in middle, happy/fed when high."""
-    if score <= 0.02:
-        return (
-            '<svg class="jardin-char-svg" viewBox="0 0 170 150" style="overflow: visible;" xmlns="http://www.w3.org/2000/svg">'
-            '<defs>'
-            '<linearGradient id="bone3DK" x1="0%" y1="0%" x2="0%" y2="100%">'
-            '<stop offset="0%" stop-color="#FEFCE8"/>'
-            '<stop offset="55%" stop-color="#E7E5E4"/>'
-            '<stop offset="100%" stop-color="#A8A29E"/>'
-            '</linearGradient>'
-            '<filter id="boneShadowK" x="-20%" y="-20%" width="140%" height="140%">'
-            '<feDropShadow dx="0" dy="3" stdDeviation="2.5" flood-color="#000000" flood-opacity="0.38"/>'
-            '</filter>'
-            '</defs>'
-            '<ellipse cx="86" cy="134" rx="68" ry="9" fill="#000000" opacity="0.28"/>'
-            '<g filter="url(#boneShadowK)">'
-            '<path d="M 10 130 Q 28 134 48 126" stroke="url(#bone3DK)" stroke-width="5.5" stroke-dasharray="6 3" stroke-linecap="round" fill="none"/>'
-            '<ellipse cx="52" cy="122" rx="11" ry="8" fill="url(#bone3DK)" transform="rotate(-15 52 122)"/>'
-            '<circle cx="52" cy="122" r="3.5" fill="#57534E"/>'
-            '<line x1="50" y1="124" x2="30" y2="136" stroke="url(#bone3DK)" stroke-width="5.5" stroke-linecap="round"/>'
-            '<circle cx="30" cy="136" r="3.8" fill="url(#bone3DK)"/>'
-            '<line x1="30" y1="136" x2="56" y2="140" stroke="url(#bone3DK)" stroke-width="4.5" stroke-linecap="round"/>'
-            '<line x1="56" y1="140" x2="78" y2="139" stroke="url(#bone3DK)" stroke-width="3.8" stroke-linecap="round"/>'
-            '<path d="M 58 120 Q 84 110 112 122" stroke="url(#bone3DK)" stroke-width="6" stroke-dasharray="7 3" stroke-linecap="round" fill="none"/>'
-            '<path d="M 68 117 Q 70 94 80 102" stroke="url(#bone3DK)" stroke-width="4" stroke-linecap="round" fill="none"/>'
-            '<path d="M 77 115 Q 80 90 90 100" stroke="url(#bone3DK)" stroke-width="4" stroke-linecap="round" fill="none"/>'
-            '<path d="M 86 115 Q 90 92 99 101" stroke="url(#bone3DK)" stroke-width="4" stroke-linecap="round" fill="none"/>'
-            '<path d="M 95 117 Q 98 96 106 104" stroke="url(#bone3DK)" stroke-width="3.8" stroke-linecap="round" fill="none"/>'
-            '<path d="M 103 119 Q 106 102 112 108" stroke="url(#bone3DK)" stroke-width="3.4" stroke-linecap="round" fill="none"/>'
-            '<line x1="106" y1="121" x2="96" y2="136" stroke="url(#bone3DK)" stroke-width="4.2" stroke-linecap="round"/>'
-            '<line x1="96" y1="136" x2="112" y2="139" stroke="url(#bone3DK)" stroke-width="3.5" stroke-linecap="round"/>'
-            '<g transform="translate(116, 114) rotate(18)">'
-            '<ellipse cx="10" cy="4" rx="14" ry="10" fill="url(#bone3DK)"/>'
-            '<path d="M 18 -2 L 38 3 Q 40 7 35 9 L 16 9 Z" fill="url(#bone3DK)"/>'
-            '<path d="M 14 9 L 33 12 L 31 15 L 12 13 Z" fill="#D6D3D1"/>'
-            '<ellipse cx="14" cy="2" rx="4.5" ry="3.8" fill="#1C1917"/>'
-            '<polygon points="33,4 37,5 34,7" fill="#1C1917"/>'
-            '<line x1="20" y1="9" x2="32" y2="10" stroke="#78716C" stroke-width="1.4" stroke-dasharray="2 2"/>'
-            '</g>'
-            '</g>'
-            '<g class="jardin-fly-1" transform="translate(78, 78)">'
-            '<ellipse cx="-2.5" cy="-2.5" rx="3.2" ry="1.8" fill="#E0F2FE" opacity="0.85" transform="rotate(-25)"/>'
-            '<ellipse cx="2.5" cy="-2.5" rx="3.2" ry="1.8" fill="#E0F2FE" opacity="0.85" transform="rotate(25)"/>'
-            '<ellipse cx="0" cy="0" rx="3.2" ry="2.2" fill="#111827"/>'
-            '</g>'
-            '<g class="jardin-fly-2" transform="translate(122, 86)">'
-            '<ellipse cx="-2.2" cy="-2.2" rx="2.8" ry="1.6" fill="#E0F2FE" opacity="0.85" transform="rotate(-25)"/>'
-            '<ellipse cx="2.2" cy="-2.2" rx="2.8" ry="1.6" fill="#E0F2FE" opacity="0.85" transform="rotate(25)"/>'
-            '<ellipse cx="0" cy="0" rx="2.8" ry="1.9" fill="#111827"/>'
-            '</g>'
-            '<g class="jardin-fly-3" transform="translate(46, 92)">'
-            '<ellipse cx="-2.2" cy="-2.2" rx="2.8" ry="1.6" fill="#E0F2FE" opacity="0.85" transform="rotate(-25)"/>'
-            '<ellipse cx="2.2" cy="-2.2" rx="2.8" ry="1.6" fill="#E0F2FE" opacity="0.85" transform="rotate(25)"/>'
-            '<ellipse cx="0" cy="0" rx="2.8" ry="1.9" fill="#111827"/>'
-            '</g>'
-            '</svg>'
-        )
-
-    fat_scale_x = 0.74 + 0.32 * score
-    posture_drop = (1.0 - score) * 12.0
-    ear_droop = (1.0 - score) * 26.0
-    ribs_opacity = max(0.0, min(0.75, (0.35 - score) / 0.35)) if score < 0.35 else 0.0
-    euca_leaf_op = max(0.0, min(1.0, (score - 0.15) / 0.5))
-    leaf_col = _multi_color([(0.0, "#A16207"), (0.5, "#EAB308"), (1.0, "#22C55E")], score)
-
-    if score >= 0.65:
-        anim_cls = "jardin-kanga-happy"
-        mouth_d = "M 82 65 Q 90 73 97 64"
-        eyes_svg = (
-            '<circle cx="85" cy="50" r="4" fill="#1F2937"/>'
-            '<circle cx="86.4" cy="48.6" r="1.4" fill="#FFFFFF"/>'
-            '<circle cx="99" cy="50" r="3.6" fill="#1F2937"/>'
-            '<circle cx="100.2" cy="48.6" r="1.2" fill="#FFFFFF"/>'
-            '<ellipse cx="78" cy="57" rx="4.5" ry="2.5" fill="#F472B6" opacity="0.5"/>'
-        )
-    else:
-        anim_cls = "jardin-animal-tired"
-        mouth_d = "M 82 70 Q 90 63 97 70"
-        eyes_svg = (
-            '<circle cx="85" cy="52" r="3.6" fill="#1F2937"/>'
-            '<path d="M 79 47 L 90 50" stroke="#451A03" stroke-width="2.1" stroke-linecap="round"/>'
-            '<circle cx="99" cy="52" r="3.4" fill="#1F2937"/>'
-            '<path d="M 94 50 L 104 47" stroke="#451A03" stroke-width="2.1" stroke-linecap="round"/>'
-            '<path d="M 75 58 Q 73 65 75 68 Q 77 65 75 58 Z" fill="#38BDF8" opacity="0.85"/>'
-        )
-
-    return (
-        '<svg class="jardin-char-svg" viewBox="0 0 160 220" style="overflow: visible;" xmlns="http://www.w3.org/2000/svg">'
-        '<defs>'
-        '<radialGradient id="kangaFur3D" cx="35%" cy="30%" r="70%">'
-        '<stop offset="0%" stop-color="#F59E0B"/>'
-        '<stop offset="55%" stop-color="#D97706"/>'
-        '<stop offset="100%" stop-color="#92400E"/>'
-        '</radialGradient>'
-        '<linearGradient id="kangaBelly3D" x1="0%" y1="0%" x2="0%" y2="100%">'
-        '<stop offset="0%" stop-color="#FEF3C7"/>'
-        '<stop offset="100%" stop-color="#FDE68A"/>'
-        '</linearGradient>'
-        '<filter id="kangaShadow3D" x="-20%" y="-20%" width="140%" height="140%">'
-        '<feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#000000" flood-opacity="0.25"/>'
-        '</filter>'
-        '</defs>'
-        '<ellipse cx="82" cy="204" rx="42" ry="9" fill="#000000" opacity="0.22"/>'
-        f'<g class="{anim_cls}" transform="translate(0, {posture_drop:.1f})" filter="url(#kangaShadow3D)">'
-        '<path d="M 48 152 Q 12 160 10 134 Q 8 120 20 122 Q 30 126 54 138 Z" fill="url(#kangaFur3D)"/>'
-        '<ellipse cx="62" cy="164" rx="18" ry="26" fill="url(#kangaFur3D)"/>'
-        '<path d="M 48 188 L 96 188 Q 104 188 102 195 L 44 195 Q 38 191 48 188 Z" fill="url(#kangaFur3D)"/>'
-        f'<g transform="translate(78, 120) scale({fat_scale_x:.2f}, 1)">'
-        '<ellipse cx="0" cy="0" rx="31" ry="46" fill="url(#kangaFur3D)"/>'
-        '<ellipse cx="5" cy="4" rx="20" ry="35" fill="url(#kangaBelly3D)"/>'
-        '</g>'
-        f'<g opacity="{ribs_opacity:.2f}" stroke="#FEF3C7" stroke-width="2.2" stroke-linecap="round" fill="none">'
-        '<path d="M 66 102 Q 80 98 91 104"/>'
-        '<path d="M 65 113 Q 80 109 92 115"/>'
-        '<path d="M 66 124 Q 80 120 91 126"/>'
-        '</g>'
-        '<path d="M 70 82 L 79 42 L 98 46 L 92 86 Z" fill="url(#kangaFur3D)"/>'
-        f'<ellipse cx="75" cy="28" rx="6.5" ry="20" fill="url(#kangaFur3D)" transform="rotate({-16 - ear_droop:.1f} 75 42)"/>'
-        f'<ellipse cx="75" cy="28" rx="3.5" ry="13" fill="#FDE68A" transform="rotate({-16 - ear_droop:.1f} 75 42)"/>'
-        f'<ellipse cx="95" cy="28" rx="6.5" ry="20" fill="url(#kangaFur3D)" transform="rotate({14 + ear_droop:.1f} 95 42)"/>'
-        f'<ellipse cx="95" cy="28" rx="3.5" ry="13" fill="#FDE68A" transform="rotate({14 + ear_droop:.1f} 95 42)"/>'
-        '<ellipse cx="88" cy="56" rx="20" ry="17" fill="url(#kangaFur3D)"/>'
-        '<ellipse cx="100" cy="60" rx="11" ry="9" fill="url(#kangaBelly3D)"/>'
-        '<circle cx="108" cy="57" r="4" fill="#1F2937"/>'
-        + eyes_svg +
-        f'<path d="{mouth_d}" stroke="#451A03" stroke-width="2.2" fill="none" stroke-linecap="round"/>'
-        '<path d="M 84 94 Q 108 102 114 114" stroke="#D97706" stroke-width="7.5" stroke-linecap="round" fill="none"/>'
-        f'<g opacity="{euca_leaf_op:.2f}" transform="translate(114, 112)">'
-        '<path d="M 0 0 Q 14 -12 22 -20" stroke="#15803D" stroke-width="2.2" fill="none"/>'
-        f'<ellipse cx="12" cy="-12" rx="7" ry="4" fill="{leaf_col}" transform="rotate(-30 12 -12)"/>'
-        f'<ellipse cx="20" cy="-18" rx="7" ry="4" fill="{leaf_col}" transform="rotate(20 20 -18)"/>'
-        '</g>'
-        '</g>'
-        '</svg>'
-    )
-
-
-def _construir_svg_koala(score):
-    """Builds the 3D koala SVG: skeleton with flies at score=0, tired/sad in middle, happy/fed when high."""
-    if score <= 0.02:
-        return (
-            '<svg class="jardin-char-svg" viewBox="0 0 170 150" style="overflow: visible;" xmlns="http://www.w3.org/2000/svg">'
-            '<defs>'
-            '<linearGradient id="bone3DKo" x1="0%" y1="0%" x2="0%" y2="100%">'
-            '<stop offset="0%" stop-color="#FEFCE8"/>'
-            '<stop offset="55%" stop-color="#E7E5E4"/>'
-            '<stop offset="100%" stop-color="#A8A29E"/>'
-            '</linearGradient>'
-            '<filter id="boneShadowKo" x="-20%" y="-20%" width="140%" height="140%">'
-            '<feDropShadow dx="0" dy="3" stdDeviation="2.5" flood-color="#000000" flood-opacity="0.38"/>'
-            '</filter>'
-            '</defs>'
-            '<ellipse cx="86" cy="134" rx="62" ry="9" fill="#000000" opacity="0.28"/>'
-            '<g filter="url(#boneShadowKo)">'
-            '<ellipse cx="122" cy="123" rx="10" ry="7.5" fill="url(#bone3DKo)" transform="rotate(12 122 123)"/>'
-            '<circle cx="122" cy="123" r="3" fill="#57534E"/>'
-            '<line x1="124" y1="125" x2="142" y2="137" stroke="url(#bone3DKo)" stroke-width="5" stroke-linecap="round"/>'
-            '<line x1="142" y1="137" x2="126" y2="140" stroke="url(#bone3DKo)" stroke-width="4" stroke-linecap="round"/>'
-            '<path d="M 62 122 Q 92 112 118 122" stroke="url(#bone3DKo)" stroke-width="6" stroke-dasharray="6 3" stroke-linecap="round" fill="none"/>'
-            '<path d="M 70 119 Q 72 95 80 103" stroke="url(#bone3DKo)" stroke-width="4" stroke-linecap="round" fill="none"/>'
-            '<path d="M 79 117 Q 81 92 89 101" stroke="url(#bone3DKo)" stroke-width="4" stroke-linecap="round" fill="none"/>'
-            '<path d="M 88 116 Q 90 93 98 102" stroke="url(#bone3DKo)" stroke-width="4" stroke-linecap="round" fill="none"/>'
-            '<path d="M 97 117 Q 99 95 106 104" stroke="url(#bone3DKo)" stroke-width="3.8" stroke-linecap="round" fill="none"/>'
-            '<path d="M 106 119 Q 108 99 114 107" stroke="url(#bone3DKo)" stroke-width="3.5" stroke-linecap="round" fill="none"/>'
-            '<line x1="70" y1="122" x2="80" y2="137" stroke="url(#bone3DKo)" stroke-width="4.5" stroke-linecap="round"/>'
-            '<line x1="80" y1="137" x2="64" y2="139" stroke="url(#bone3DKo)" stroke-width="3.8" stroke-linecap="round"/>'
-            '<g transform="translate(44, 114) rotate(-16)">'
-            '<ellipse cx="10" cy="4" rx="16" ry="13" fill="url(#bone3DKo)"/>'
-            '<ellipse cx="2" cy="12" rx="11" ry="6" fill="#D6D3D1"/>'
-            '<circle cx="5" cy="2" r="4.5" fill="#1C1917"/>'
-            '<circle cx="16" cy="2" r="4.2" fill="#1C1917"/>'
-            '<polygon points="9,6 6,12 13,12" fill="#1C1917"/>'
-            '<line x1="3" y1="14" x2="14" y2="14" stroke="#78716C" stroke-width="1.5" stroke-dasharray="2 2"/>'
-            '</g>'
-            '</g>'
-            '<g class="jardin-fly-2" transform="translate(52, 82)">'
-            '<ellipse cx="-2.5" cy="-2.5" rx="3.2" ry="1.8" fill="#E0F2FE" opacity="0.85" transform="rotate(-25)"/>'
-            '<ellipse cx="2.5" cy="-2.5" rx="3.2" ry="1.8" fill="#E0F2FE" opacity="0.85" transform="rotate(25)"/>'
-            '<ellipse cx="0" cy="0" rx="3.2" ry="2.2" fill="#111827"/>'
-            '</g>'
-            '<g class="jardin-fly-1" transform="translate(96, 78)">'
-            '<ellipse cx="-2.2" cy="-2.2" rx="2.8" ry="1.6" fill="#E0F2FE" opacity="0.85" transform="rotate(-25)"/>'
-            '<ellipse cx="2.2" cy="-2.2" rx="2.8" ry="1.6" fill="#E0F2FE" opacity="0.85" transform="rotate(25)"/>'
-            '<ellipse cx="0" cy="0" rx="2.8" ry="1.9" fill="#111827"/>'
-            '</g>'
-            '<g class="jardin-fly-3" transform="translate(124, 90)">'
-            '<ellipse cx="-2.2" cy="-2.2" rx="2.8" ry="1.6" fill="#E0F2FE" opacity="0.85" transform="rotate(-25)"/>'
-            '<ellipse cx="2.2" cy="-2.2" rx="2.8" ry="1.6" fill="#E0F2FE" opacity="0.85" transform="rotate(25)"/>'
-            '<ellipse cx="0" cy="0" rx="2.8" ry="1.9" fill="#111827"/>'
-            '</g>'
-            '</svg>'
-        )
-
-    fat_scale_x = 0.74 + 0.32 * score
-    posture_drop = (1.0 - score) * 12.0
-    ear_droop = (1.0 - score) * 22.0
-    ribs_opacity = max(0.0, min(0.75, (0.35 - score) / 0.35)) if score < 0.35 else 0.0
-    euca_leaf_op = max(0.0, min(1.0, (score - 0.15) / 0.5))
-    leaf_col = _multi_color([(0.0, "#A16207"), (0.5, "#EAB308"), (1.0, "#22C55E")], score)
-
-    if score >= 0.65:
-        anim_cls = "jardin-koala-happy"
-        mouth_d = "M 72 78 Q 80 86 88 78"
-        eyes_svg = (
-            '<circle cx="68" cy="62" r="4.2" fill="#1F2937"/>'
-            '<circle cx="69.4" cy="60.6" r="1.4" fill="#FFFFFF"/>'
-            '<circle cx="92" cy="62" r="4.2" fill="#1F2937"/>'
-            '<circle cx="93.4" cy="60.6" r="1.4" fill="#FFFFFF"/>'
-            '<ellipse cx="61" cy="70" rx="5" ry="2.8" fill="#F472B6" opacity="0.55"/>'
-            '<ellipse cx="99" cy="70" rx="5" ry="2.8" fill="#F472B6" opacity="0.55"/>'
-        )
-    else:
-        anim_cls = "jardin-animal-tired"
-        mouth_d = "M 72 84 Q 80 77 88 84"
-        eyes_svg = (
-            '<circle cx="68" cy="64" r="3.6" fill="#1F2937"/>'
-            '<path d="M 62 58 L 73 61" stroke="#1F2937" stroke-width="2.1" stroke-linecap="round"/>'
-            '<circle cx="92" cy="64" r="3.6" fill="#1F2937"/>'
-            '<path d="M 87 61 L 98 58" stroke="#1F2937" stroke-width="2.1" stroke-linecap="round"/>'
-            '<path d="M 56 70 Q 54 77 56 80 Q 58 77 56 70 Z" fill="#38BDF8" opacity="0.85"/>'
-        )
-
-    return (
-        '<svg class="jardin-char-svg" viewBox="0 0 160 220" style="overflow: visible;" xmlns="http://www.w3.org/2000/svg">'
-        '<defs>'
-        '<radialGradient id="koalaFur3D" cx="35%" cy="30%" r="70%">'
-        '<stop offset="0%" stop-color="#9CA3AF"/>'
-        '<stop offset="60%" stop-color="#6B7280"/>'
-        '<stop offset="100%" stop-color="#374151"/>'
-        '</radialGradient>'
-        '<linearGradient id="koalaBelly3D" x1="0%" y1="0%" x2="0%" y2="100%">'
-        '<stop offset="0%" stop-color="#F3F4F6"/>'
-        '<stop offset="100%" stop-color="#D1D5DB"/>'
-        '</linearGradient>'
-        '<linearGradient id="koalaTrunk3D" x1="0%" y1="0%" x2="100%" y2="0%">'
-        '<stop offset="0%" stop-color="#78350F"/>'
-        '<stop offset="50%" stop-color="#92400E"/>'
-        '<stop offset="100%" stop-color="#451A03"/>'
-        '</linearGradient>'
-        '<filter id="koalaShadow3D" x="-20%" y="-20%" width="140%" height="140%">'
-        '<feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#000000" flood-opacity="0.25"/>'
-        '</filter>'
-        '</defs>'
-        '<ellipse cx="80" cy="204" rx="40" ry="9" fill="#000000" opacity="0.22"/>'
-        '<path d="M 114 206 L 122 55 L 136 55 L 130 206 Z" fill="url(#koalaTrunk3D)" filter="url(#koalaShadow3D)"/>'
-        '<path d="M 122 98 Q 96 82 68 88" stroke="#78350F" stroke-width="7" stroke-linecap="round" fill="none"/>'
-        f'<g class="{anim_cls}" transform="translate(0, {posture_drop:.1f})" filter="url(#koalaShadow3D)">'
-        f'<g transform="translate(80, 134) scale({fat_scale_x:.2f}, 1)">'
-        '<ellipse cx="0" cy="0" rx="34" ry="42" fill="url(#koalaFur3D)"/>'
-        '<ellipse cx="-2" cy="5" rx="22" ry="30" fill="url(#koalaBelly3D)"/>'
-        '</g>'
-        f'<g opacity="{ribs_opacity:.2f}" stroke="#F3F4F6" stroke-width="2.2" stroke-linecap="round" fill="none">'
-        '<path d="M 66 116 Q 80 112 94 116"/>'
-        '<path d="M 64 127 Q 80 123 96 127"/>'
-        '<path d="M 66 138 Q 80 134 94 138"/>'
-        '</g>'
-        '<ellipse cx="56" cy="170" rx="13" ry="16" fill="url(#koalaFur3D)"/>'
-        '<ellipse cx="102" cy="170" rx="13" ry="16" fill="url(#koalaFur3D)"/>'
-        '<ellipse cx="52" cy="110" rx="12" ry="10" fill="url(#koalaFur3D)"/>'
-        '<ellipse cx="108" cy="110" rx="12" ry="10" fill="url(#koalaFur3D)"/>'
-        f'<circle cx="48" cy="{48 + int(ear_droop * 0.35)}" r="16" fill="url(#koalaFur3D)"/>'
-        f'<circle cx="48" cy="{48 + int(ear_droop * 0.35)}" r="9" fill="#E5E7EB"/>'
-        f'<circle cx="112" cy="{48 + int(ear_droop * 0.35)}" r="16" fill="url(#koalaFur3D)"/>'
-        f'<circle cx="112" cy="{48 + int(ear_droop * 0.35)}" r="9" fill="#E5E7EB"/>'
-        '<ellipse cx="80" cy="66" rx="29" ry="25" fill="url(#koalaFur3D)"/>'
-        '<ellipse cx="80" cy="68" rx="8" ry="11.5" fill="#1F2937"/>'
-        '<ellipse cx="77.5" cy="64.5" rx="2.6" ry="4" fill="#4B5563"/>'
-        + eyes_svg +
-        f'<path d="{mouth_d}" stroke="#1F2937" stroke-width="2.2" fill="none" stroke-linecap="round"/>'
-        f'<g opacity="{euca_leaf_op:.2f}" transform="translate(44, 102)">'
-        f'<ellipse cx="0" cy="0" rx="10" ry="5.5" fill="{leaf_col}" transform="rotate(-25)"/>'
-        '</g>'
-        '</g>'
-        '</svg>'
-    )
-
-
 def construir_html_panel_patrimonio(
-    total_patrimonio_ars,
-    total_patrimonio_usd,
+    total_patrimonio_aud,
     cant_activos_contemplados,
     cant_activos_totales,
-    ingreso_mensual_ars,
-    costo_mensual_ars,
-    dolar_b,
-    hay_moneda_extranjera=False,
+    ingreso_mensual_aud,
+    costo_mensual_aud,
     datos_faltantes=False
 ):
-    tasa_invalida = hay_moneda_extranjera and (dolar_b is None or float(dolar_b) <= 0)
-    es_crecimiento = False
-
-    if tasa_invalida:
-        score = 0.5
-        mensaje_salud = (
-            "⚠️ Warning: Assets or costs in another currency were detected, "
-            "but no exchange rate is available to convert to ARS."
-        )
-    elif datos_faltantes or (ingreso_mensual_ars <= 0 and costo_mensual_ars <= 0):
+    if datos_faltantes or (ingreso_mensual_aud <= 0 and costo_mensual_aud <= 0):
         score = 0.5
         mensaje_salud = "Add your income and costs to see your financial health"
     else:
-        monthly_saving = float(ingreso_mensual_ars) - float(costo_mensual_ars)
+        monthly_saving = float(ingreso_mensual_aud) - float(costo_mensual_aud)
 
         if abs(monthly_saving) < 0.005:
             score = 1.0
-            mensaje_salud = "We're doing well financially: your monthly savings are zero and your net worth stays intact."
+            mensaje_salud = "Balanced: your monthly savings are $0 AUD and your net worth stays intact."
         elif monthly_saving > 0:
             score = 1.0
-            es_crecimiento = True
             mensaje_salud = (
-                f"We're doing great financially: you save {monthly_saving:,.0f} ARS/month and your net worth is growing."
+                f"Great shape: you save ${monthly_saving:,.0f} AUD/month and your net worth is growing."
             )
         else:
             perdida_mensual = abs(monthly_saving)
-            if total_patrimonio_ars <= 0:
+            if total_patrimonio_aud <= 0:
                 score = 0.0
-                mensaje_salud = "Finances on fire! At this rate you have 0 months of runway left."
+                mensaje_salud = "Alert: at this spending rate you have 0 months of runway left."
             else:
-                months_left = float(total_patrimonio_ars) / float(perdida_mensual)
+                months_left = float(total_patrimonio_aud) / float(perdida_mensual)
                 meses_int = max(0, int(round(months_left)))
                 anios_s = meses_int // 12
                 meses_rem = meses_int % 12
@@ -919,317 +613,55 @@ def construir_html_panel_patrimonio(
                     score = (months_left - 12.0) / (60.0 - 12.0)
 
                 if months_left <= 12.0:
-                    mensaje_salud = f"Finances on fire! At this rate you have {tiempo_str} of runway left."
+                    mensaje_salud = f"Alert: at this rate you have {tiempo_str} of runway left."
                 else:
                     mensaje_salud = (
-                        f"Your monthly savings are negative (−{perdida_mensual:,.0f} ARS): "
+                        f"Negative monthly savings (−${perdida_mensual:,.0f} AUD): "
                         f"at this rate your net worth lasts {tiempo_str}."
                     )
-
-    sky_top = "#0EA5E9" if es_crecimiento else _multi_color([
-        (0.0, "#7F1D1D"),
-        (0.25, "#C2410C"),
-        (0.55, "#F59E0B"),
-        (0.80, "#7DD3FC"),
-        (1.0, "#38BDF8")
-    ], score)
-    sky_mid = "#A5F3FC" if es_crecimiento else _multi_color([
-        (0.0, "#DC2626"),
-        (0.25, "#EA580C"),
-        (0.55, "#FDE68A"),
-        (0.80, "#BAE6FD"),
-        (1.0, "#CCFBF1")
-    ], score)
-    sky_bot = "#A7F3D0" if es_crecimiento else _multi_color([
-        (0.0, "#F97316"),
-        (0.25, "#FDBA74"),
-        (0.55, "#FEF3C7"),
-        (0.80, "#DCFCE7"),
-        (1.0, "#BBF7D0")
-    ], score)
-
-    hill_back = _multi_color([
-        (0.0, "#9A3412"),
-        (0.30, "#B45309"),
-        (0.60, "#A16207"),
-        (0.85, "#4ADE80"),
-        (1.0, "#10B981" if es_crecimiento else "#22C55E")
-    ], score)
-    hill_mid = _multi_color([
-        (0.0, "#B45309"),
-        (0.30, "#D97706"),
-        (0.60, "#CA8A04"),
-        (0.85, "#22C55E"),
-        (1.0, "#059669" if es_crecimiento else "#16A34A")
-    ], score)
-    ground_front = _multi_color([
-        (0.0, "#78350F"),
-        (0.30, "#92400E"),
-        (0.60, "#854D0E"),
-        (0.85, "#15803D"),
-        (1.0, "#047857" if es_crecimiento else "#166534")
-    ], score)
-
-    leaf_main = _multi_color([
-        (0.0, "#78350F"),
-        (0.25, "#A16207"),
-        (0.55, "#EAB308"),
-        (0.80, "#4ADE80"),
-        (1.0, "#10B981" if es_crecimiento else "#16A34A")
-    ], score)
-    leaf_light = _multi_color([
-        (0.0, "#92400E"),
-        (0.25, "#CA8A04"),
-        (0.55, "#FDE047"),
-        (0.80, "#86EFAC"),
-        (1.0, "#6EE7B7" if es_crecimiento else "#4ADE80")
-    ], score)
-    leaf_dark = _multi_color([
-        (0.0, "#451A03"),
-        (0.25, "#713F12"),
-        (0.55, "#A16207"),
-        (0.80, "#15803D"),
-        (1.0, "#065F46" if es_crecimiento else "#14532D")
-    ], score)
 
     border_col = _multi_color([
         (0.0, "#EF4444"),
         (0.35, "#F59E0B"),
         (0.70, "#84CC16"),
-        (1.0, "#10B981" if es_crecimiento else "#22C55E")
+        (1.0, "#0EA5E9")
     ], score)
-
-    fire_opacity = max(0.0, min(1.0, ((1.0 - score) ** 1.35)))
-    sun_radius = 16.0 + (1.0 - score) * 10.0
-    sun_core_col = _multi_color([(0.0, "#FEF08A"), (0.4, "#FDE047"), (1.0, "#FEF9C3")], score)
-    sun_outer_col = _multi_color([(0.0, "#DC2626"), (0.4, "#F97316"), (1.0, "#FBBF24")], score)
-    tumbleweed_opacity = max(0.0, min(1.0, (0.38 - score) / 0.38)) if score < 0.38 else 0.0
-    cracks_opacity = max(0.0, min(1.0, (0.45 - score) / 0.45)) if score < 0.45 else 0.0
-    clouds_opacity = max(0.0, min(0.92, (score - 0.15) / 0.85))
-    flowers_opacity = max(0.0, min(1.0, (score - 0.55) / 0.45))
-    fruits_opacity = 1.0 if es_crecimiento else 0.0
-    droop_deg = (1.0 - score) * 34.0
-
-    def _plant_style(threshold):
-        if score <= 0.02 or score <= threshold:
-            return 0.0, 0.0
-        sc = max(0.15, min(1.0, (score - threshold) / (1.0 - threshold)))
-        op = max(0.0, min(1.0, (score - threshold) / max(0.18, 1.0 - threshold)))
-        mult_s = 0.68 if es_crecimiento else 0.62
-        return sc * mult_s, op
-
-    t1_s, t1_o = _plant_style(0.04)
-    t2_s, t2_o = _plant_style(0.18)
-    t3_s, t3_o = _plant_style(0.35)
-    t4_s, t4_o = _plant_style(0.52)
-    t5_s, t5_o = _plant_style(0.68)
-
     pct_salud = int(round(score * 100))
     badge_bg = _multi_color([
         (0.0, "#FEE2E2"),
         (0.35, "#FEF3C7"),
         (0.75, "#DCFCE7"),
-        (1.0, "#D1FAE5")
+        (1.0, "#E0F2FE")
     ], score)
     badge_text = _multi_color([
         (0.0, "#991B1B"),
         (0.35, "#92400E"),
         (0.75, "#166534"),
-        (1.0, "#065F46")
+        (1.0, "#0C4A6E")
     ], score)
 
-    svg_canguro = _construir_svg_canguro(score)
-    svg_koala = _construir_svg_koala(score)
-
-    frutas_arbol_grande = (
-        f'<g opacity="{fruits_opacity:.2f}">'
-        '<circle cx="-14" cy="-86" r="5.2" fill="#EF4444"/><circle cx="-15" cy="-87.5" r="1.5" fill="#FCA5A5"/>'
-        '<circle cx="15" cy="-84" r="5.2" fill="#F97316"/><circle cx="13.5" cy="-85.5" r="1.5" fill="#FDBA74"/>'
-        '<circle cx="0" cy="-66" r="5.2" fill="#EF4444"/><circle cx="-1.5" cy="-67.5" r="1.5" fill="#FCA5A5"/>'
-        '<circle cx="-8" cy="-102" r="4.5" fill="#F43F5E"/>'
-        '<circle cx="10" cy="-100" r="4.8" fill="#FB923C"/>'
-        '<circle cx="-22" cy="-68" r="4.2" fill="#FDE047"/>'
-        '<circle cx="22" cy="-68" r="4.2" fill="#F472B6"/>'
-        '</g>'
-    )
-    frutas_arbol_mediano = (
-        f'<g opacity="{fruits_opacity:.2f}">'
-        '<circle cx="-10" cy="-66" r="4.8" fill="#EF4444"/>'
-        '<circle cx="11" cy="-64" r="4.8" fill="#F97316"/>'
-        '<circle cx="0" cy="-52" r="4.5" fill="#F43F5E"/>'
-        '<circle cx="-14" cy="-52" r="3.8" fill="#FDE047"/>'
-        '<circle cx="14" cy="-52" r="3.8" fill="#F472B6"/>'
-        '</g>'
-    )
-
-    lineas_html = [
-        f'<div class="jardin-health-scene" style="border-color: {border_col};">',
-        f'<div class="jardin-info-panel" style="border-right-color: {border_col};">',
-        '<div class="kpi-title" style="font-size: 1.05rem; color: #1F2937; margin-bottom: 1px;">Total Net Worth</div>',
-        f'<div class="kpi-value" style="font-size: 1.72rem; color: #111827; line-height: 1.12;">{total_patrimonio_ars:,.0f} ARS</div>',
-        f'<div class="kpi-usd" style="font-size: 0.96rem; color: #1F2937; background: rgba(255,255,255,0.92); margin-top: 3px; padding: 2px 9px;">{total_patrimonio_usd:,.2f} USD</div>',
-        f'<div class="jardin-status-box" style="background: {badge_bg}; color: {badge_text}; border-color: {border_col};">',
-        f'<div style="font-size: 0.84rem; font-weight: 800; line-height: 1.25;">{mensaje_salud}</div>',
-        '<div class="jardin-health-bar-track">',
-        f'<div class="jardin-health-bar-fill" style="width: {pct_salud}%; background: {border_col};"></div>',
-        '</div>',
-        '</div>',
-        f'<div class="kpi-sub" style="color: #374151; font-weight: 700; font-size: 0.82rem; margin-top: 5px; margin-bottom: 0;">{cant_activos_contemplados} of {cant_activos_totales} assets included</div>',
-        '</div>',
-        '<div class="jardin-scene-panel">',
-        '<svg class="jardin-scene-svg" viewBox="0 0 900 160" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">',
-        '<defs>',
-        '<linearGradient id="skyGrad" x1="0%" y1="0%" x2="0%" y2="100%">',
-        f'<stop offset="0%" stop-color="{sky_top}"/>',
-        f'<stop offset="55%" stop-color="{sky_mid}"/>',
-        f'<stop offset="100%" stop-color="{sky_bot}"/>',
-        '</linearGradient>',
-        '<radialGradient id="sunGrad" cx="50%" cy="50%" r="50%">',
-        f'<stop offset="0%" stop-color="{sun_core_col}"/>',
-        f'<stop offset="65%" stop-color="{sun_outer_col}"/>',
-        f'<stop offset="100%" stop-color="{sun_outer_col}" stop-opacity="0"/>',
-        '</radialGradient>',
-        '<linearGradient id="hillBackGrad" x1="0%" y1="0%" x2="0%" y2="100%">',
-        f'<stop offset="0%" stop-color="{hill_back}"/>',
-        f'<stop offset="100%" stop-color="{ground_front}"/>',
-        '</linearGradient>',
-        '<linearGradient id="hillMidGrad" x1="0%" y1="0%" x2="0%" y2="100%">',
-        f'<stop offset="0%" stop-color="{hill_mid}"/>',
-        f'<stop offset="100%" stop-color="{ground_front}"/>',
-        '</linearGradient>',
-        '<linearGradient id="foliage3D" x1="20%" y1="0%" x2="80%" y2="100%">',
-        f'<stop offset="0%" stop-color="{leaf_light}"/>',
-        f'<stop offset="55%" stop-color="{leaf_main}"/>',
-        f'<stop offset="100%" stop-color="{leaf_dark}"/>',
-        '</linearGradient>',
-        '<linearGradient id="trunk3D" x1="0%" y1="0%" x2="100%" y2="0%">',
-        '<stop offset="0%" stop-color="#78350F"/>',
-        '<stop offset="45%" stop-color="#92400E"/>',
-        '<stop offset="100%" stop-color="#451A03"/>',
-        '</linearGradient>',
-        '<filter id="softShadow3D" x="-20%" y="-20%" width="140%" height="140%">',
-        '<feDropShadow dx="0" dy="3" stdDeviation="2.5" flood-color="#000000" flood-opacity="0.24"/>',
-        '</filter>',
-        '</defs>',
-        '<rect x="0" y="0" width="900" height="160" fill="url(#skyGrad)"/>',
-        f'<g class="jardin-sun-group" transform="translate(450, {34 + int((1.0 - score) * 10)})">',
-        f'<circle cx="0" cy="0" r="{sun_radius * 2.1:.1f}" fill="url(#sunGrad)" opacity="{0.45 + 0.45 * fire_opacity:.2f}"/>',
-        f'<g class="jardin-sun-flames" opacity="{fire_opacity:.2f}">',
-        f'<polygon points="0,-{sun_radius*1.65:.1f} 8,-{sun_radius*0.85:.1f} -8,-{sun_radius*0.85:.1f}" fill="#EF4444"/>',
-        f'<polygon points="0,{sun_radius*1.65:.1f} 8,{sun_radius*0.85:.1f} -8,{sun_radius*0.85:.1f}" fill="#EF4444"/>',
-        f'<polygon points="-{sun_radius*1.65:.1f},0 -{sun_radius*0.85:.1f},8 -{sun_radius*0.85:.1f},-8" fill="#F97316"/>',
-        f'<polygon points="{sun_radius*1.65:.1f},0 {sun_radius*0.85:.1f},8 {sun_radius*0.85:.1f},-8" fill="#F97316"/>',
-        f'<polygon points="-{sun_radius*1.2:.1f},-{sun_radius*1.2:.1f} -{sun_radius*0.5:.1f},-{sun_radius*0.9:.1f} -{sun_radius*0.9:.1f},-{sun_radius*0.5:.1f}" fill="#DC2626"/>',
-        f'<polygon points="{sun_radius*1.2:.1f},-{sun_radius*1.2:.1f} {sun_radius*0.5:.1f},-{sun_radius*0.9:.1f} {sun_radius*0.9:.1f},-{sun_radius*0.5:.1f}" fill="#DC2626"/>',
-        f'<polygon points="-{sun_radius*1.2:.1f},{sun_radius*1.2:.1f} -{sun_radius*0.5:.1f},{sun_radius*0.9:.1f} -{sun_radius*0.9:.1f},{sun_radius*0.5:.1f}" fill="#F59E0B"/>',
-        f'<polygon points="{sun_radius*1.2:.1f},{sun_radius*1.2:.1f} {sun_radius*0.5:.1f},{sun_radius*0.9:.1f} {sun_radius*0.9:.1f},{sun_radius*0.5:.1f}" fill="#F59E0B"/>',
-        '</g>',
-        f'<circle cx="0" cy="0" r="{sun_radius:.1f}" fill="{sun_core_col}" filter="url(#softShadow3D)"/>',
-        '</g>',
-        f'<g class="jardin-clouds" opacity="{clouds_opacity:.2f}" fill="#FFFFFF">',
-        '<g transform="translate(230, 26) scale(0.75)" opacity="0.82">',
-        '<ellipse cx="0" cy="0" rx="34" ry="14"/><ellipse cx="-20" cy="4" rx="20" ry="11"/><ellipse cx="22" cy="4" rx="22" ry="10"/>',
-        '</g>',
-        '<g transform="translate(670, 24) scale(0.75)" opacity="0.78">',
-        '<ellipse cx="0" cy="0" rx="36" ry="15"/><ellipse cx="-22" cy="5" rx="22" ry="11"/><ellipse cx="22" cy="5" rx="20" ry="10"/>',
-        '</g>',
-        '</g>',
-        '<path d="M 0 118 Q 180 86 360 110 T 660 104 T 900 116 L 900 160 L 0 160 Z" fill="url(#hillBackGrad)" opacity="0.88"/>',
-        '<path d="M 0 128 Q 220 102 450 124 T 900 122 L 900 160 L 0 160 Z" fill="url(#hillMidGrad)" opacity="0.95"/>',
-        f'<path d="M 0 138 Q 270 126 540 139 T 900 136 L 900 160 L 0 160 Z" fill="{ground_front}"/>',
-        f'<g stroke="#451A03" stroke-width="1.5" fill="none" opacity="{cracks_opacity:.2f}">',
-        '<path d="M 220 143 L 238 149 L 228 156 M 238 149 L 256 152"/>',
-        '<path d="M 430 146 L 452 151 L 442 158 M 452 151 L 474 149"/>',
-        '<path d="M 640 143 L 660 150 L 650 157 M 660 150 L 682 153"/>',
-        '</g>',
-        f'<g class="jardin-sway-tree" opacity="{t1_o:.2f}" transform="translate(215, 132) scale({t1_s:.2f}) rotate({droop_deg * 0.45:.1f})" filter="url(#softShadow3D)">',
-        '<path d="M -7 0 L -4 -68 L 4 -68 L 7 0 Z" fill="url(#trunk3D)"/>',
-        '<circle cx="0" cy="-82" r="34" fill="url(#foliage3D)"/>',
-        '<circle cx="-22" cy="-68" r="25" fill="url(#foliage3D)"/>',
-        '<circle cx="22" cy="-68" r="25" fill="url(#foliage3D)"/>',
-        '<circle cx="0" cy="-104" r="24" fill="url(#foliage3D)"/>',
-        frutas_arbol_grande,
-        '</g>',
-        f'<g class="jardin-sway-tree-alt" opacity="{t2_o:.2f}" transform="translate(295, 136) scale({t2_s:.2f}) rotate({droop_deg * 0.6:.1f})" filter="url(#softShadow3D)">',
-        '<path d="M -5 0 L -3 -52 L 3 -52 L 5 0 Z" fill="url(#trunk3D)"/>',
-        '<ellipse cx="0" cy="-64" rx="28" ry="24" fill="url(#foliage3D)"/>',
-        '<circle cx="-16" cy="-54" r="18" fill="url(#foliage3D)"/>',
-        '<circle cx="16" cy="-54" r="18" fill="url(#foliage3D)"/>',
-        frutas_arbol_mediano,
-        '</g>',
-        f'<g class="jardin-sway-tree" opacity="{t3_o:.2f}" transform="translate(385, 134) scale({t3_s:.2f}) rotate({droop_deg * 0.5:.1f})" filter="url(#softShadow3D)">',
-        '<path d="M -6 0 L -3 -58 L 3 -58 L 6 0 Z" fill="url(#trunk3D)"/>',
-        '<circle cx="0" cy="-72" r="30" fill="url(#foliage3D)"/>',
-        '<circle cx="-18" cy="-58" r="22" fill="url(#foliage3D)"/>',
-        '<circle cx="18" cy="-58" r="22" fill="url(#foliage3D)"/>',
-        frutas_arbol_mediano,
-        '</g>',
-        f'<g class="jardin-sway-tree-alt" opacity="{t3_o:.2f}" transform="translate(535, 134) scale({t3_s:.2f}) rotate(-{droop_deg * 0.55:.1f})" filter="url(#softShadow3D)">',
-        '<path d="M -6 0 L -3 -58 L 3 -58 L 6 0 Z" fill="url(#trunk3D)"/>',
-        '<circle cx="0" cy="-72" r="30" fill="url(#foliage3D)"/>',
-        '<circle cx="-18" cy="-58" r="22" fill="url(#foliage3D)"/>',
-        '<circle cx="18" cy="-58" r="22" fill="url(#foliage3D)"/>',
-        frutas_arbol_mediano,
-        '</g>',
-        f'<g class="jardin-sway-tree" opacity="{t2_o:.2f}" transform="translate(650, 136) scale({t2_s:.2f}) rotate(-{droop_deg * 0.6:.1f})" filter="url(#softShadow3D)">',
-        '<path d="M -5 0 L -3 -52 L 3 -52 L 5 0 Z" fill="url(#trunk3D)"/>',
-        '<ellipse cx="0" cy="-64" rx="28" ry="24" fill="url(#foliage3D)"/>',
-        '<circle cx="-16" cy="-54" r="18" fill="url(#foliage3D)"/>',
-        '<circle cx="16" cy="-54" r="18" fill="url(#foliage3D)"/>',
-        frutas_arbol_mediano,
-        '</g>',
-        f'<g class="jardin-sway-tree-alt" opacity="{t1_o:.2f}" transform="translate(765, 132) scale({t1_s:.2f}) rotate(-{droop_deg * 0.4:.1f})" filter="url(#softShadow3D)">',
-        '<path d="M -7 0 L -4 -70 L 4 -70 L 7 0 Z" fill="url(#trunk3D)"/>',
-        '<circle cx="0" cy="-86" r="35" fill="url(#foliage3D)"/>',
-        '<circle cx="-24" cy="-70" r="25" fill="url(#foliage3D)"/>',
-        '<circle cx="24" cy="-70" r="25" fill="url(#foliage3D)"/>',
-        '<circle cx="0" cy="-108" r="24" fill="url(#foliage3D)"/>',
-        frutas_arbol_grande,
-        '</g>',
-        f'<g class="jardin-sway-bush" opacity="{t4_o:.2f}" transform="translate(340, 140) scale({t4_s:.2f}) rotate({droop_deg * 0.7:.1f})">',
-        '<ellipse cx="0" cy="-14" rx="22" ry="15" fill="url(#foliage3D)"/>',
-        '<ellipse cx="-14" cy="-10" rx="16" ry="12" fill="url(#foliage3D)"/>',
-        '<ellipse cx="14" cy="-10" rx="16" ry="12" fill="url(#foliage3D)"/>',
-        '</g>',
-        f'<g class="jardin-sway-bush" opacity="{t4_o:.2f}" transform="translate(460, 141) scale({t5_s:.2f}) rotate({droop_deg * 0.5:.1f})">',
-        '<ellipse cx="0" cy="-16" rx="25" ry="16" fill="url(#foliage3D)"/>',
-        '<ellipse cx="-15" cy="-11" rx="17" ry="12" fill="url(#foliage3D)"/>',
-        '<ellipse cx="15" cy="-11" rx="17" ry="12" fill="url(#foliage3D)"/>',
-        '</g>',
-        f'<g class="jardin-sway-bush" opacity="{t4_o:.2f}" transform="translate(595, 140) scale({t4_s:.2f}) rotate(-{droop_deg * 0.7:.1f})">',
-        '<ellipse cx="0" cy="-14" rx="22" ry="15" fill="url(#foliage3D)"/>',
-        '<ellipse cx="-14" cy="-10" rx="16" ry="12" fill="url(#foliage3D)"/>',
-        '<ellipse cx="14" cy="-10" rx="16" ry="12" fill="url(#foliage3D)"/>',
-        '</g>',
-        f'<g opacity="{flowers_opacity:.2f}">',
-        '<circle cx="245" cy="144" r="3.8" fill="#F472B6"/><circle cx="245" cy="144" r="1.6" fill="#FEF08A"/>',
-        '<circle cx="315" cy="147" r="3.8" fill="#A78BFA"/><circle cx="315" cy="147" r="1.6" fill="#FEF08A"/>',
-        '<circle cx="405" cy="145" r="3.5" fill="#FB7185"/><circle cx="405" cy="145" r="1.5" fill="#FEF08A"/>',
-        '<circle cx="515" cy="146" r="3.8" fill="#F472B6"/><circle cx="515" cy="146" r="1.6" fill="#FEF08A"/>',
-        '<circle cx="620" cy="144" r="3.8" fill="#A78BFA"/><circle cx="620" cy="144" r="1.6" fill="#FEF08A"/>',
-        '<circle cx="710" cy="147" r="3.5" fill="#FBBF24"/><circle cx="710" cy="147" r="1.5" fill="#FFFFFF"/>',
-        '<circle cx="820" cy="145" r="3.8" fill="#FB7185"/><circle cx="820" cy="145" r="1.6" fill="#FEF08A"/>',
-        '</g>',
-        f'<g opacity="{tumbleweed_opacity:.2f}">',
-        '<g class="jardin-tumbleweed-1">',
-        '<circle cx="0" cy="0" r="12" fill="none" stroke="#78350F" stroke-width="1.8" stroke-dasharray="5 3"/>',
-        '<ellipse cx="0" cy="0" rx="12" ry="7" fill="none" stroke="#92400E" stroke-width="1.4" transform="rotate(35)"/>',
-        '<ellipse cx="0" cy="0" rx="12" ry="7" fill="none" stroke="#78350F" stroke-width="1.4" transform="rotate(-35)"/>',
-        '<path d="M -8 -4 L 8 4 M -7 5 L 7 -5" stroke="#92400E" stroke-width="1.2"/>',
-        '</g>',
-        '<g class="jardin-tumbleweed-2">',
-        '<circle cx="0" cy="0" r="10" fill="none" stroke="#78350F" stroke-width="1.6" stroke-dasharray="4 2.5"/>',
-        '<ellipse cx="0" cy="0" rx="10" ry="6" fill="none" stroke="#92400E" stroke-width="1.3" transform="rotate(50)"/>',
-        '<ellipse cx="0" cy="0" rx="10" ry="6" fill="none" stroke="#78350F" stroke-width="1.3" transform="rotate(-40)"/>',
-        '</g>',
-        '</g>',
-        '</svg>',
-        f'<div class="jardin-char-wrap jardin-char-left">{svg_canguro}</div>',
-        f'<div class="jardin-char-wrap jardin-char-right">{svg_koala}</div>',
-        '</div>',
-        '</div>'
-    ]
-    return "\n".join(lineas_html)
+    return f"""
+    <div style="background: #F8FAFC; border: 2px solid {border_col}; border-left: 8px solid {border_col};
+                border-radius: 16px; padding: 18px 22px; margin-bottom: 1.1rem;
+                box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);">
+        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 16px;">
+            <div>
+                <div style="font-size: 1.05rem; font-weight: 700; color: #334155;">Total Net Worth</div>
+                <div style="font-size: 2.2rem; font-weight: 800; color: #0F172A; line-height: 1.15;">${total_patrimonio_aud:,.2f} AUD</div>
+                <div style="font-size: 0.9rem; font-weight: 600; color: #475569; margin-top: 4px;">
+                    {cant_activos_contemplados} of {cant_activos_totales} assets included
+                </div>
+            </div>
+            <div style="flex: 1; min-width: 260px; max-width: 540px; background: {badge_bg}; color: {badge_text};
+                        border: 1.5px solid {border_col}; border-radius: 12px; padding: 12px 16px;">
+                <div style="font-size: 0.95rem; font-weight: 800; line-height: 1.35;">{mensaje_salud}</div>
+                <div class="jardin-health-bar-track" style="margin-top: 8px;">
+                    <div class="jardin-health-bar-fill" style="width: {pct_salud}%; background: {border_col};"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    """
 
 
 # ----------------- 2D PIE CHART WITH 1 DECIMAL & NO POPUPS -----------------
@@ -1318,7 +750,7 @@ def crear_torta_2d(df, col_valores, col_nombres, tamano="mediano", usar_minuscul
     return fig
 
 
-# ----------------- CLEAN HORIZONTAL BAR CHART -----------------
+# ----------------- CLEAN HORIZONTAL BAR CHART (AUD) -----------------
 def crear_barras_horizontales(df, col_valores, col_nombres):
     df_ord = df.sort_values(by=col_valores, ascending=True).copy()
     valores = df_ord[col_valores].tolist()
@@ -1337,7 +769,7 @@ def crear_barras_horizontales(df, col_valores, col_nombres):
         else:
             colores.append("#ABEBC6")
 
-    textos = [f"  {v:,.0f} ARS ({(v / total) * 100:.1f}%)" for v in valores]
+    textos = [f"  ${v:,.0f} AUD ({(v / total) * 100:.1f}%)" for v in valores]
 
     fig = go.Figure(data=[go.Bar(
         x=valores,
@@ -1500,46 +932,44 @@ BONOS_BASE = [
 ]
 
 UBICACIONES_BASE = [
-    "Binance", "Nexo", "IOL", "CommBank",
-    "Up Bank", "Macquarie", "Mercado Pago", "Uala"
+    "Up Bank", "CommBank", "Macquarie", "Binance",
+    "Nexo", "IOL", "Stake", "Mercado Pago"
 ]
 
 
+def normalizar_tipo_activo_inv(tipo_raw):
+    t = str(tipo_raw or "").strip()
+    if t in ["Cash AUD", "A - Cash AUD", "AUD", "Efectivo / Banco"]:
+        return "Cash AUD"
+    if t in ["Pesos ARS", "A - Pesos ARS", "B - Pesos ARS"]:
+        return "Cash AUD"
+    if t in ["Dólares USD", "B - Dólares USD", "Dólar Billete", "A - Dólar Billete"]:
+        return "Cash USD"
+    if t in ["C - Stocks", "C - Acciones", "Stocks", "Acciones", "Acciones / CEDEARs"]:
+        return "Stocks"
+    if t in ["D - Cryptos", "Cryptos", "D - Criptomonedas", "Criptomonedas"]:
+        return "Cryptos"
+    if t in ["E - Bonds", "E - Bonos", "Bonds", "Bonos"]:
+        return "Bonds"
+    if t in ["F - FCI", "FCI"]:
+        return "FCI"
+    return "Others"
+
+
 def reparar_inversiones_corruptas(inversiones):
-    """Repairs rows whose detail is ARS or USD cash but got saved under another category."""
     modificado = False
     for inv in (inversiones or []):
         inv.setdefault("activo_inv", True)
         tipo_norm = normalizar_tipo_activo_inv(inv.get("tipo", "Others"))
-        det_str = str(inv.get("activo", "")).strip()
-        det_up = det_str.upper()
-        sim_up = str(inv.get("simbolo", "")).strip().upper()
-
-        if det_up in ["PESOS ARS", "PESOS", "A - PESOS ARS", "B - PESOS ARS", "EFECTIVO / BANCO", "ARS CASH"] or (
-            sim_up == "ARS" and tipo_norm in ["Stocks", "Cryptos", "Bonds"]
-        ):
-            if inv.get("tipo") != "Pesos ARS" or inv.get("activo") != "Pesos ARS" or inv.get("simbolo") != "ARS":
-                inv["tipo"] = "Pesos ARS"
-                inv["activo"] = "Pesos ARS"
-                inv["simbolo"] = "ARS"
+        if inv.get("tipo") != tipo_norm:
+            inv["tipo"] = tipo_norm
+            modificado = True
+        if tipo_norm in ["Cryptos", "Stocks", "Bonds"]:
+            det_str = str(inv.get("activo", "")).strip()
+            det_ticker = det_str.split(" ")[0].upper()
+            if det_ticker and det_ticker not in ["USD", "ARS", "AUD"] and inv.get("simbolo") != det_ticker:
+                inv["simbolo"] = det_ticker
                 modificado = True
-        elif det_up in ["DÓLARES USD", "DOLARES USD", "DÓLAR BILLETE", "DOLAR BILLETE", "A - DÓLAR BILLETE", "B - DÓLARES USD", "USD CASH"] or (
-            sim_up == "USD" and tipo_norm in ["Stocks", "Cryptos", "Bonds"]
-        ):
-            if inv.get("tipo") != "Dólares USD" or inv.get("activo") != "Dólares USD" or inv.get("simbolo") != "USD":
-                inv["tipo"] = "Dólares USD"
-                inv["activo"] = "Dólares USD"
-                inv["simbolo"] = "USD"
-                modificado = True
-        else:
-            if inv.get("tipo") != tipo_norm:
-                inv["tipo"] = tipo_norm
-                modificado = True
-            if tipo_norm in ["Cryptos", "Stocks", "Bonds"]:
-                det_ticker = det_str.split(" ")[0].upper()
-                if det_ticker and det_ticker not in ["USD", "ARS"] and inv.get("simbolo") != det_ticker:
-                    inv["simbolo"] = det_ticker
-                    modificado = True
     return modificado
 
 
@@ -1555,23 +985,6 @@ def parsear_numero_flexible(texto):
     elif "," in s:
         s = s.replace(",", ".")
     return float(s)
-
-
-def normalizar_tipo_activo_inv(tipo_raw):
-    t = str(tipo_raw or "").strip()
-    if t in ["A - Pesos ARS", "B - Pesos ARS", "Pesos ARS", "Efectivo / Banco"]:
-        return "Pesos ARS"
-    if t in ["B - Dólares USD", "Dólares USD", "Dólar Billete", "A - Dólar Billete"]:
-        return "Dólares USD"
-    if t in ["C - Stocks", "C - Acciones", "Stocks", "Acciones", "Acciones / CEDEARs"]:
-        return "Stocks"
-    if t in ["D - Cryptos", "Cryptos", "D - Criptomonedas", "Criptomonedas"]:
-        return "Cryptos"
-    if t in ["E - Bonds", "E - Bonos", "Bonds", "Bonos"]:
-        return "Bonds"
-    if t in ["F - FCI", "FCI"]:
-        return "FCI"
-    return "Others"
 
 
 def normalizar_lista_activos_con_base(lista_guardada, lista_base):
@@ -1661,11 +1074,11 @@ def cargar_datos():
         "bonos_guardadas": list(BONOS_BASE),
         "ubicaciones_guardadas": list(UBICACIONES_BASE),
         "ultimas_selecciones_inv": {
-            "tipo": "A - Pesos ARS",
+            "tipo": "A - Cash AUD",
             "accion": "AAPL (Apple)",
             "cripto": "BTC (Bitcoin)",
             "bono": "AL30 (Bonar 2030 Ley Arg.)",
-            "ubicacion": "Binance"
+            "ubicacion": "Up Bank"
         },
         "inversiones": [
             {
@@ -1782,20 +1195,21 @@ def cargar_datos():
             if not isinstance(ult_sel, dict):
                 ult_sel = {}
             mapa_tipo_opt = {
-                "Pesos ARS": "A - Pesos ARS",
-                "B - Pesos ARS": "A - Pesos ARS",
-                "A - Pesos ARS": "A - Pesos ARS",
-                "Dólares USD": "B - Dólares USD",
-                "Dólar Billete": "B - Dólares USD",
-                "A - Dólar Billete": "B - Dólares USD",
-                "B - Dólares USD": "B - Dólares USD",
+                "Cash AUD": "A - Cash AUD",
+                "A - Cash AUD": "A - Cash AUD",
+                "Pesos ARS": "A - Cash AUD",
+                "A - Pesos ARS": "A - Cash AUD",
+                "B - Pesos ARS": "A - Cash AUD",
+                "Cash USD": "B - Cash USD",
+                "B - Cash USD": "B - Cash USD",
+                "Dólares USD": "B - Cash USD",
+                "B - Dólares USD": "B - Cash USD",
                 "Stocks": "C - Stocks",
                 "Acciones": "C - Stocks",
                 "C - Acciones": "C - Stocks",
                 "C - Stocks": "C - Stocks",
                 "Cryptos": "D - Cryptos",
                 "Criptomonedas": "D - Cryptos",
-                "D - Criptomonedas": "D - Cryptos",
                 "D - Cryptos": "D - Cryptos",
                 "Bonds": "E - Bonds",
                 "Bonos": "E - Bonds",
@@ -1805,15 +1219,14 @@ def cargar_datos():
                 "F - FCI": "F - FCI",
                 "Others": "G - Others",
                 "Otros": "G - Others",
-                "E - Otros": "G - Others",
                 "G - Otros": "G - Others",
                 "G - Others": "G - Others"
             }
-            ult_sel["tipo"] = mapa_tipo_opt.get(ult_sel.get("tipo", ""), "A - Pesos ARS")
+            ult_sel["tipo"] = mapa_tipo_opt.get(ult_sel.get("tipo", ""), "A - Cash AUD")
             ult_sel.setdefault("accion", data["acciones_guardadas"][0] if data["acciones_guardadas"] else "AAPL (Apple)")
             ult_sel.setdefault("cripto", data["criptos_guardadas"][0] if data["criptos_guardadas"] else "BTC (Bitcoin)")
             ult_sel.setdefault("bono", data["bonos_guardadas"][0] if data.get("bonos_guardadas") else "AL30 (Bonar 2030 Ley Arg.)")
-            ult_sel.setdefault("ubicacion", data["ubicaciones_guardadas"][0] if data["ubicaciones_guardadas"] else "Binance")
+            ult_sel.setdefault("ubicacion", data["ubicaciones_guardadas"][0] if data["ubicaciones_guardadas"] else "Up Bank")
             data["ultimas_selecciones_inv"] = ult_sel
 
             data.setdefault("historial_cierres", [])
@@ -1848,61 +1261,57 @@ def calcular_texto_ultima_actualizacion(datos, fecha_actual_sydney):
         return "Last saved: Today"
 
 
-# ----------------- EXCEL (.XLSX) EXPORT ON LOGOUT -----------------
-def armar_dataframes_exportacion(datos, dolar_b, cotizaciones):
+# ----------------- EXCEL (.XLSX) EXPORT ON LOGOUT (AUD ONLY) -----------------
+def armar_dataframes_exportacion(datos, usd_to_aud, cotizaciones):
     fecha_actual = datetime.now(TZ_SYDNEY).strftime("%Y-%m-%d %H:%M")
 
     filas_mov = []
     for c in datos.get("costos", []):
-        monto_ars = float(c.get("monto", 0))
+        monto_aud = float(c.get("monto", 0))
         filas_mov.append({
             "Record Date": fecha_actual,
             "Type": "Cost",
             "Category": c.get("grupo", ""),
             "Subcategory / Item": c.get("categoria", ""),
             "Active": "Yes" if c.get("activo", True) else "No",
-            "Amount (ARS)": monto_ars,
-            "Amount (USD Blue)": round(monto_ars / dolar_b, 2) if dolar_b > 0 else 0.0
+            "Amount (AUD)": monto_aud
         })
 
     for i in datos.get("ingresos", []):
-        monto_ars = float(i.get("monto", 0))
+        monto_aud = float(i.get("monto", 0))
         filas_mov.append({
             "Record Date": fecha_actual,
             "Type": "Income",
             "Category": i.get("grupo", ""),
             "Subcategory / Item": i.get("concepto", ""),
             "Active": "Yes" if i.get("activo", True) else "No",
-            "Amount (ARS)": monto_ars,
-            "Amount (USD Blue)": round(monto_ars / dolar_b, 2) if dolar_b > 0 else 0.0
+            "Amount (AUD)": monto_aud
         })
 
     df_mov = pd.DataFrame(filas_mov) if filas_mov else pd.DataFrame(
-        columns=["Record Date", "Type", "Category", "Subcategory / Item", "Active", "Amount (ARS)", "Amount (USD Blue)"]
+        columns=["Record Date", "Type", "Category", "Subcategory / Item", "Active", "Amount (AUD)"]
     )
 
     filas_inv = []
     for inv in datos.get("inversiones", []):
         cant = float(inv.get("cantidad", 0))
-        tipo = normalizar_tipo_activo_inv(inv.get("tipo", "Pesos ARS"))
+        tipo = normalizar_tipo_activo_inv(inv.get("tipo", "Cash AUD"))
         simbolo = str(inv.get("simbolo", "")).upper().strip().split(" ")[0]
-        if tipo == "Dólares USD":
-            val_usd = cant
-            val_ars = cant * dolar_b
+        if tipo == "Cash AUD":
+            val_aud = cant
+        elif tipo == "Cash USD":
+            val_aud = cant * usd_to_aud
         elif tipo in ["Cryptos", "Stocks"]:
-            precio_u = cotizaciones.get(simbolo, 1.0 if tipo == "Cryptos" else 100.0)
-            val_usd = cant * precio_u
-            val_ars = val_usd * dolar_b
+            precio_u_usd = cotizaciones.get(simbolo, 1.0 if tipo == "Cryptos" else 100.0)
+            val_aud = cant * precio_u_usd * usd_to_aud
         elif tipo == "Bonds":
-            precio_u_ars = cotizaciones.get(f"BONO_ARS_{simbolo}", float(inv.get("precio_unitario_ars", 1120.0)))
-            val_ars = cant * precio_u_ars
-            val_usd = val_ars / dolar_b if dolar_b > 0 else 0.0
+            precio_u_usd = cotizaciones.get(f"BONO_USD_{simbolo}", 1.0)
+            val_aud = cant * precio_u_usd * usd_to_aud
         else:
-            precio_u_ars = float(inv.get("precio_unitario_ars", 1.0))
-            if simbolo and simbolo not in ["ARS", "USD"] and simbolo in cotizaciones:
-                precio_u_ars = cotizaciones[simbolo] * dolar_b
-            val_ars = cant * precio_u_ars
-            val_usd = val_ars / dolar_b if dolar_b > 0 else 0.0
+            precio_u_aud = float(inv.get("precio_unitario_aud", 1.0))
+            if simbolo and simbolo not in ["AUD", "USD", "ARS"] and simbolo in cotizaciones:
+                precio_u_aud = cotizaciones[simbolo] * usd_to_aud
+            val_aud = cant * precio_u_aud
 
         filas_inv.append({
             "Record Date": fecha_actual,
@@ -1911,12 +1320,11 @@ def armar_dataframes_exportacion(datos, dolar_b, cotizaciones):
             "Location / Platform": inv.get("plataforma", ""),
             "Quantity": cant,
             "Active in Portfolio": "Yes" if inv.get("activo_inv", True) else "No",
-            "Estimated Value (ARS)": round(val_ars, 2),
-            "Estimated Value (USD)": round(val_usd, 2)
+            "Estimated Value (AUD)": round(val_aud, 2)
         })
 
     df_inv = pd.DataFrame(filas_inv) if filas_inv else pd.DataFrame(
-        columns=["Record Date", "Asset Category", "Asset", "Location / Platform", "Quantity", "Active in Portfolio", "Estimated Value (ARS)", "Estimated Value (USD)"]
+        columns=["Record Date", "Asset Category", "Asset", "Location / Platform", "Quantity", "Active in Portfolio", "Estimated Value (AUD)"]
     )
 
     df_hist = pd.DataFrame(datos.get("historial_cierres", []))
@@ -1924,7 +1332,6 @@ def armar_dataframes_exportacion(datos, dolar_b, cotizaciones):
 
 
 def _generar_xlsx_fallback_zip(hojas_dict):
-    """Native .xlsx generator without external dependencies if openpyxl is not installed."""
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("[Content_Types].xml", """<?xml version="1.0" encoding="UTF-8"?>
@@ -1982,8 +1389,8 @@ def _generar_xlsx_fallback_zip(hojas_dict):
     return buf.getvalue()
 
 
-def generar_excel_bytes(datos, dolar_b, cotizaciones):
-    df_mov, df_inv, df_hist = armar_dataframes_exportacion(datos, dolar_b, cotizaciones)
+def generar_excel_bytes(datos, usd_to_aud, cotizaciones):
+    df_mov, df_inv, df_hist = armar_dataframes_exportacion(datos, usd_to_aud, cotizaciones)
     try:
         buf = io.BytesIO()
         with pd.ExcelWriter(buf, engine="openpyxl") as writer:
@@ -2000,7 +1407,7 @@ def generar_excel_bytes(datos, dolar_b, cotizaciones):
         })
 
 
-def registrar_snapshot_cierre(datos, dolar_b, cotizaciones):
+def registrar_snapshot_cierre(datos):
     fecha_str = datetime.now(TZ_SYDNEY).strftime("%Y-%m-%d %H:%M")
     costos_act = sum(c["monto"] for c in datos.get("costos", []) if c.get("activo", True))
     ingresos_act = sum(i["monto"] for i in datos.get("ingresos", []) if i.get("activo", True))
@@ -2010,11 +1417,9 @@ def registrar_snapshot_cierre(datos, dolar_b, cotizaciones):
     if not hist or hist[-1].get("Date") != fecha_str:
         hist.append({
             "Date": fecha_str,
-            "Income ARS": round(ingresos_act, 2),
-            "Costs ARS": round(costos_act, 2),
-            "Savings ARS": round(ahorro_act, 2),
-            "Blue Dollar": round(dolar_b, 2),
-            "Savings USD": round(ahorro_act / dolar_b, 2) if dolar_b > 0 else 0.0
+            "Income AUD": round(ingresos_act, 2),
+            "Costs AUD": round(costos_act, 2),
+            "Savings AUD": round(ahorro_act, 2)
         })
     guardar_datos(datos, registrar_cambio=False)
 
@@ -2036,7 +1441,7 @@ def enviar_codigo_por_email(destinatario, codigo, usuario_actual, datos):
             msg = MIMEMultipart()
             msg["From"] = smtp_user
             msg["To"] = destinatario
-            msg["Subject"] = "🌿 Recovery Code - Finapp"
+            msg["Subject"] = "💳 Recovery Code - Finapp"
             cuerpo = (
                 f"Hi!\n\n"
                 f"You requested to recover access to Finapp.\n\n"
@@ -2064,7 +1469,7 @@ def enviar_codigo_por_email(destinatario, codigo, usuario_actual, datos):
             "User-Agent": "Mozilla/5.0"
         }
         payload = {
-            "_subject": "🌿 Recovery Code - Finapp",
+            "_subject": "💳 Recovery Code - Finapp",
             "_template": "box",
             "_captcha": "false",
             "Platform": "Finapp",
@@ -2105,7 +1510,7 @@ def enviar_codigo_por_celular(telefono_limpio, codigo, usuario_actual, datos):
         pass
 
     mensaje_texto = (
-        f"🌿 Finapp: Your username is {usuario_actual} "
+        f"💳 Finapp: Your username is {usuario_actual} "
         f"and your security code is: {codigo}"
     )
 
@@ -2151,11 +1556,11 @@ def enviar_codigo_por_celular(telefono_limpio, codigo, usuario_actual, datos):
     )
 
 
-# ----------------- EXTERNAL MARKET QUOTES -----------------
+# ----------------- EXTERNAL MARKET QUOTES (ALL CONVERTED TO AUD) -----------------
 @st.cache_data(ttl=180)
 def obtener_cotizaciones(simbolos_acciones, simbolos_cripto, simbolos_bonos=()):
     cotiz = {
-        "dolar_blue": 1575.0,
+        "usd_to_aud": 1.53,
         "BTC": 82000.0,
         "ETH": 2600.0,
         "USDT": 1.0,
@@ -2174,55 +1579,15 @@ def obtener_cotizaciones(simbolos_acciones, simbolos_cripto, simbolos_bonos=()):
         "AMZN": 200.0,
         "TSLA": 250.0,
         "NVDA": 135.0,
-        "YPFD": 28.0,
-        "BONO_ARS_AL30": 1120.0,
-        "BONO_ARS_GD30": 1145.0,
-        "BONO_ARS_AL29": 1160.0,
-        "BONO_ARS_GD29": 1185.0,
-        "BONO_ARS_AL35": 980.0,
-        "BONO_ARS_GD35": 1010.0,
-        "BONO_ARS_AE38": 1030.0,
-        "BONO_ARS_GD38": 1065.0,
-        "BONO_ARS_AL41": 940.0,
-        "BONO_ARS_GD41": 970.0,
-        "BONO_ARS_GD46": 995.0,
-        "BONO_ARS_BPY26": 1320.0,
-        "BONO_ARS_BPJ25": 1410.0,
-        "BONO_ARS_BPO27": 1240.0,
-        "BONO_ARS_TX26": 2150.0,
-        "BONO_ARS_TX28": 1980.0,
-        "BONO_ARS_TZX26": 2340.0,
-        "BONO_ARS_TZX27": 2190.0,
-        "BONO_ARS_TZX28": 2050.0,
-        "BONO_ARS_DICP": 34500.0,
-        "BONO_ARS_PARP": 16800.0,
-        "BONO_ARS_CUAP": 22400.0,
-        "BONO_ARS_PR17": 1850.0,
-        "BONO_ARS_TVPP": 18.5,
-        "BONO_ARS_TVPA": 420.0,
-        "BONO_ARS_TVPY": 450.0,
-        "BONO_ARS_S31E5": 1280.0,
-        "BONO_ARS_S28F5": 1310.0,
-        "BONO_ARS_S31M5": 1345.0,
-        "BONO_ARS_S30J5": 1420.0,
-        "BONO_ARS_S30S5": 1495.0,
-        "BONO_ARS_T15D5": 1580.0,
-        "BONO_ARS_YCA6O": 1590.0,
-        "BONO_ARS_YMCHO": 1620.0,
-        "BONO_ARS_MRCAO": 1550.0,
-        "BONO_ARS_IRCFO": 1580.0,
-        "BONO_ARS_TLCTO": 1540.0,
-        "BONO_ARS_PNDCO": 1610.0,
-        "BONO_ARS_MGCHO": 1595.0,
-        "BONO_ARS_CS38O": 1530.0
+        "YPFD": 28.0
     }
 
     try:
-        url_dolar = "https://dolarapi.com/v1/dolares/blue"
-        r_dolar = requests.get(url_dolar, timeout=4)
-        if r_dolar.status_code == 200:
-            venta = r_dolar.json().get("venta", cotiz["dolar_blue"])
-            cotiz["dolar_blue"] = float(venta)
+        r_fx = requests.get("https://open.er-api.com/v6/latest/USD", timeout=4)
+        if r_fx.status_code == 200:
+            rate = r_fx.json().get("rates", {}).get("AUD")
+            if rate and float(rate) > 0:
+                cotiz["usd_to_aud"] = float(rate)
     except Exception:
         pass
 
@@ -2246,7 +1611,7 @@ def obtener_cotizaciones(simbolos_acciones, simbolos_cripto, simbolos_bonos=()):
     headers = {"User-Agent": "Mozilla/5.0"}
     for ticker in set(simbolos_acciones):
         t_clean = ticker.upper().strip().split(" ")[0]
-        if not t_clean or t_clean in ["USD", "ARS"]:
+        if not t_clean or t_clean in ["USD", "ARS", "AUD"]:
             continue
         try:
             url_yf = f"https://query1.finance.yahoo.com/v8/finance/chart/{t_clean}?interval=1d&range=1d"
@@ -2256,36 +1621,6 @@ def obtener_cotizaciones(simbolos_acciones, simbolos_cripto, simbolos_bonos=()):
                 precio_vivo = float(res.get("regularMarketPrice", 0))
                 if precio_vivo > 0:
                     cotiz[t_clean] = precio_vivo
-        except Exception:
-            pass
-
-    for bono in set(simbolos_bonos or ()):
-        b_clean = bono.upper().strip().split(" ")[0]
-        if not b_clean or b_clean in ["USD", "ARS"]:
-            continue
-        try:
-            url_ba = f"https://query1.finance.yahoo.com/v8/finance/chart/{b_clean}.BA?interval=1d&range=1d"
-            r_ba = requests.get(url_ba, headers=headers, timeout=3)
-            if r_ba.status_code == 200:
-                res_ba = r_ba.json()["chart"]["result"][0]["meta"]
-                p_ba = float(res_ba.get("regularMarketPrice", 0))
-                currency_ba = str(res_ba.get("currency", "ARS")).upper()
-                if p_ba > 0:
-                    if b_clean[:2] in ["AL", "GD", "AE", "BP", "TX", "TZ"] and p_ba > 25000:
-                        p_ba = p_ba / 100.0
-                    cotiz[f"BONO_ARS_{b_clean}"] = p_ba if currency_ba == "ARS" else (p_ba * cotiz["dolar_blue"])
-                    continue
-        except Exception:
-            pass
-        try:
-            url_us = f"https://query1.finance.yahoo.com/v8/finance/chart/{b_clean}?interval=1d&range=1d"
-            r_us = requests.get(url_us, headers=headers, timeout=3)
-            if r_us.status_code == 200:
-                res_us = r_us.json()["chart"]["result"][0]["meta"]
-                p_us = float(res_us.get("regularMarketPrice", 0))
-                currency_us = str(res_us.get("currency", "USD")).upper()
-                if p_us > 0:
-                    cotiz[f"BONO_ARS_{b_clean}"] = (p_us * cotiz["dolar_blue"]) if currency_us == "USD" else p_us
         except Exception:
             pass
 
@@ -2314,33 +1649,33 @@ st.markdown("""
     }
 
     .jardin-login-box {
-        background: linear-gradient(145deg, #EAF6EE 0%, #F5F0FF 100%);
-        border: 2px solid #95D5B2;
+        background: linear-gradient(145deg, #F0F9FF 0%, #F5F3FF 100%);
+        border: 2px solid #7DD3FC;
         border-radius: 22px;
         padding: 28px 24px 18px 24px;
-        box-shadow: 0 8px 20px rgba(45, 106, 79, 0.08);
+        box-shadow: 0 8px 20px rgba(14, 116, 144, 0.08);
         text-align: center;
         margin-top: 10px;
         margin-bottom: 14px;
     }
     .jardin-login-title {
-        color: #1B4332;
+        color: #0C4A6E;
         font-weight: 800;
         font-size: 1.9rem;
-        margin: 10px 0 6px 0;
+        margin: 8px 0 6px 0;
     }
     .jardin-login-sub {
-        color: #40916C;
+        color: #0284C7;
         font-size: 1.05rem;
         font-weight: 500;
         margin-bottom: 4px;
     }
     div[data-testid="stFormSubmitButton"] button {
-        background: linear-gradient(90deg, #40916C 0%, #2D6A4F 100%) !important;
+        background: linear-gradient(90deg, #0284C7 0%, #0369A1 100%) !important;
         color: #FFFFFF !important;
         font-weight: 700 !important;
         border-radius: 12px !important;
-        border: 2px solid #1B4332 !important;
+        border: 2px solid #0C4A6E !important;
         min-height: 46px !important;
     }
     div[data-testid="stFormSubmitButton"] button p,
@@ -2350,9 +1685,9 @@ st.markdown("""
     }
     details div[data-testid="stForm"] div[data-testid="stFormSubmitButton"] button,
     button.btn-mas-trebol {
-        background: #57CC99 !important;
-        background-color: #57CC99 !important;
-        border: 1.5px solid #38A3A5 !important;
+        background: #38BDF8 !important;
+        background-color: #38BDF8 !important;
+        border: 1.5px solid #0284C7 !important;
         color: #FFFFFF !important;
         width: 38px !important;
         min-width: 38px !important;
@@ -2364,13 +1699,13 @@ st.markdown("""
         display: inline-flex !important;
         align-items: center !important;
         justify-content: center !important;
-        box-shadow: 0 2px 6px rgba(87, 204, 153, 0.25) !important;
+        box-shadow: 0 2px 6px rgba(56, 189, 248, 0.25) !important;
     }
     details div[data-testid="stForm"] div[data-testid="stFormSubmitButton"] button:hover,
     button.btn-mas-trebol:hover {
-        background: #48B886 !important;
-        background-color: #48B886 !important;
-        border-color: #2D6A4F !important;
+        background: #0284C7 !important;
+        background-color: #0284C7 !important;
+        border-color: #0C4A6E !important;
     }
     details div[data-testid="stForm"] div[data-testid="stFormSubmitButton"] button p,
     details div[data-testid="stForm"] div[data-testid="stFormSubmitButton"] button span,
@@ -2398,11 +1733,11 @@ st.markdown("""
         border: none !important;
     }
     .stTabs [data-baseweb="tab-list"] {
-        gap: 16px !important;
+        gap: 14px !important;
         margin-bottom: 1.25rem !important;
         padding: 8px 4px !important;
         height: auto !important;
-        min-height: 72px !important;
+        min-height: 68px !important;
         overflow: visible !important;
         background: transparent !important;
         border: none !important;
@@ -2410,31 +1745,31 @@ st.markdown("""
         flex-wrap: wrap !important;
     }
     .stTabs button[data-baseweb="tab"] {
-        min-height: 58px !important;
+        min-height: 54px !important;
         height: auto !important;
-        padding: 12px 32px !important;
+        padding: 10px 26px !important;
         background-color: #F9FAFB !important;
         border-radius: 999px !important;
-        border: 1.5px solid #D8ECE3 !important;
+        border: 1.5px solid #E5E7EB !important;
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04) !important;
         transition: all 0.25s ease-in-out !important;
         overflow: visible !important;
     }
     .stTabs button[data-baseweb="tab"]:hover {
-        background-color: #F0FBF6 !important;
-        border-color: #A8DFC4 !important;
+        background-color: #F0F9FF !important;
+        border-color: #7DD3FC !important;
         transform: translateY(-1px) !important;
-        box-shadow: 0 5px 12px rgba(45, 106, 79, 0.10) !important;
+        box-shadow: 0 5px 12px rgba(14, 116, 144, 0.10) !important;
     }
     .stTabs button[data-baseweb="tab"][aria-selected="true"] {
-        background-color: #E6F7EF !important;
-        border: 2px solid #A8DFC4 !important;
+        background-color: #E0F2FE !important;
+        border: 2px solid #7DD3FC !important;
         border-radius: 999px !important;
-        box-shadow: 0 4px 14px rgba(45, 106, 79, 0.14) !important;
+        box-shadow: 0 4px 14px rgba(14, 116, 144, 0.14) !important;
     }
     .stTabs button[data-baseweb="tab"] [data-testid="stMarkdownContainer"] p,
     .stTabs button[data-baseweb="tab"] p {
-        font-size: 1.22rem !important;
+        font-size: 1.12rem !important;
         font-weight: 800 !important;
         color: #4B5563 !important;
         text-transform: uppercase !important;
@@ -2447,18 +1782,7 @@ st.markdown("""
     }
     .stTabs button[data-baseweb="tab"][aria-selected="true"] [data-testid="stMarkdownContainer"] p,
     .stTabs button[data-baseweb="tab"][aria-selected="true"] p {
-        color: #1B4332 !important;
-    }
-    .stTabs button[data-baseweb="tab"] .trebol-tab-icon {
-        font-size: 1.3em !important;
-        line-height: 1 !important;
-        vertical-align: middle !important;
-        display: inline-block !important;
-        opacity: 0.5 !important;
-        transition: opacity 0.25s ease-in-out !important;
-    }
-    .stTabs button[data-baseweb="tab"][aria-selected="true"] .trebol-tab-icon {
-        opacity: 1 !important;
+        color: #0C4A6E !important;
     }
 
     div[data-testid="stElementContainer"]:has(> div > .hook-agregar-costo),
@@ -2640,15 +1964,6 @@ st.markdown("""
         font-weight: 800;
         line-height: 1.2;
     }
-    .kpi-usd {
-        font-size: 1.05rem;
-        font-weight: 600;
-        margin-top: 0.35rem;
-        padding: 3px 10px;
-        border-radius: 8px;
-        background-color: rgba(255, 255, 255, 0.7);
-        display: inline-block;
-    }
     .kpi-sub {
         font-size: 0.95rem;
         font-weight: 600;
@@ -2685,72 +2000,6 @@ st.markdown("""
         cursor: default !important;
     }
 
-    .jardin-health-scene {
-        position: relative;
-        width: 100%;
-        max-width: 100%;
-        margin: 0 0 1.1rem 0;
-        border-radius: 18px;
-        border: 3px solid #22C55E;
-        overflow: hidden;
-        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
-        min-height: 142px;
-        display: flex;
-        flex-direction: row;
-        align-items: stretch;
-        padding: 0;
-        box-sizing: border-box;
-    }
-    .jardin-info-panel {
-        flex: 0 0 32%;
-        width: 32%;
-        min-width: 280px;
-        background: #FDFBF7;
-        border-right: 2px solid #22C55E;
-        padding: 8px 14px;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        text-align: center;
-        box-sizing: border-box;
-        z-index: 2;
-    }
-    .jardin-scene-panel {
-        flex: 1 1 68%;
-        width: 68%;
-        position: relative;
-        overflow: hidden;
-        min-height: 142px;
-        box-sizing: border-box;
-    }
-    .jardin-scene-svg {
-        position: absolute;
-        inset: 0;
-        width: 100%;
-        height: 100%;
-        z-index: 1;
-        pointer-events: none;
-    }
-    .jardin-char-wrap {
-        position: absolute;
-        bottom: 4px;
-        width: 82px;
-        height: 112px;
-        z-index: 3;
-        pointer-events: none;
-        overflow: visible !important;
-        display: flex;
-        align-items: flex-end;
-        justify-content: center;
-    }
-    .jardin-char-left {
-        left: 10px;
-    }
-    .jardin-char-right {
-        left: 92px;
-        right: auto;
-    }
     .jardin-cant-tooltip-wrap {
         position: relative !important;
     }
@@ -2792,20 +2041,6 @@ st.markdown("""
         color: #1F2937 !important;
         fill: #1F2937 !important;
     }
-    .jardin-char-svg {
-        width: 100%;
-        height: 100%;
-        overflow: visible !important;
-    }
-    .jardin-status-box {
-        margin-top: 5px;
-        padding: 6px 10px;
-        border-radius: 10px;
-        border: 1.5px solid;
-        width: 100%;
-        box-sizing: border-box;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
-    }
     .jardin-health-bar-track {
         width: 100%;
         height: 6px;
@@ -2821,136 +2056,7 @@ st.markdown("""
         transition: width 0.5s ease;
     }
 
-    @keyframes jardinKangaBounce {
-        0%, 100% { transform: translateY(0px) scaleY(1); }
-        45% { transform: translateY(-7px) scaleY(1.03); }
-        55% { transform: translateY(-7px) scaleY(1.03); }
-    }
-    @keyframes jardinKoalaSway {
-        0%, 100% { transform: translateY(0px) rotate(0deg); }
-        50% { transform: translateY(-3px) rotate(-2.5deg); }
-    }
-    @keyframes jardinTiredBreath {
-        0%, 100% { transform: translateY(4px) scaleY(0.98); }
-        50% { transform: translateY(7px) scaleY(0.95); }
-    }
-    @keyframes jardinSunFireSpin {
-        0% { transform: rotate(0deg) scale(1); }
-        50% { transform: translateY(-1px) rotate(180deg) scale(1.09); }
-        100% { transform: rotate(360deg) scale(1); }
-    }
-    @keyframes jardinTumbleweedRoll1 {
-        0% { transform: translate(115px, 141px) rotate(0deg); }
-        25% { transform: translate(295px, 131px) rotate(180deg); }
-        50% { transform: translate(475px, 142px) rotate(360deg); }
-        75% { transform: translate(640px, 132px) rotate(540deg); }
-        100% { transform: translate(780px, 141px) rotate(720deg); }
-    }
-    @keyframes jardinTumbleweedRoll2 {
-        0% { transform: translate(190px, 145px) rotate(0deg); }
-        50% { transform: translate(470px, 135px) rotate(360deg); }
-        100% { transform: translate(730px, 144px) rotate(720deg); }
-    }
-    @keyframes jardinFlyBuzz1 {
-        0% { transform: translate(65px, 78px) rotate(0deg); }
-        25% { transform: translate(82px, 66px) rotate(25deg); }
-        50% { transform: translate(98px, 80px) rotate(-15deg); }
-        75% { transform: translate(76px, 90px) rotate(20deg); }
-        100% { transform: translate(65px, 78px) rotate(0deg); }
-    }
-    @keyframes jardinFlyBuzz2 {
-        0% { transform: translate(112px, 86px) rotate(0deg); }
-        33% { transform: translate(96px, 72px) rotate(-25deg); }
-        66% { transform: translate(124px, 74px) rotate(18deg); }
-        100% { transform: translate(112px, 86px) rotate(0deg); }
-    }
-    @keyframes jardinFlyBuzz3 {
-        0% { transform: translate(44px, 90px) rotate(0deg); }
-        33% { transform: translate(58px, 76px) rotate(22deg); }
-        66% { transform: translate(36px, 78px) rotate(-20deg); }
-        100% { transform: translate(44px, 90px) rotate(0deg); }
-    }
-
-    .jardin-kanga-happy {
-        animation: jardinKangaBounce 2.4s ease-in-out infinite;
-        transform-origin: 82px 195px;
-    }
-    .jardin-koala-happy {
-        animation: jardinKoalaSway 2.8s ease-in-out infinite;
-        transform-origin: 80px 180px;
-    }
-    .jardin-animal-tired {
-        animation: jardinTiredBreath 3.4s ease-in-out infinite;
-        transform-origin: center bottom;
-    }
-    .jardin-sun-flames {
-        animation: jardinSunFireSpin 7s linear infinite;
-    }
-    .jardin-tumbleweed-1 {
-        animation: jardinTumbleweedRoll1 7.5s linear infinite;
-    }
-    .jardin-tumbleweed-2 {
-        animation: jardinTumbleweedRoll2 9.5s linear infinite;
-    }
-    .jardin-fly-1 {
-        animation: jardinFlyBuzz1 1.3s ease-in-out infinite;
-    }
-    .jardin-fly-2 {
-        animation: jardinFlyBuzz2 1.1s ease-in-out infinite;
-    }
-    .jardin-fly-3 {
-        animation: jardinFlyBuzz3 1.5s ease-in-out infinite;
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-        .jardin-kanga-happy,
-        .jardin-koala-happy,
-        .jardin-animal-tired,
-        .jardin-sun-flames,
-        .jardin-tumbleweed-1,
-        .jardin-tumbleweed-2,
-        .jardin-fly-1,
-        .jardin-fly-2,
-        .jardin-fly-3 {
-            animation: none !important;
-        }
-    }
-
     @media (max-width: 768px) {
-        .jardin-health-scene {
-            flex-direction: column !important;
-            width: 100% !important;
-            max-width: 100% !important;
-            min-height: auto !important;
-        }
-        .jardin-info-panel {
-            flex: 1 1 100% !important;
-            width: 100% !important;
-            max-width: 100% !important;
-            min-width: 0 !important;
-            border-right: none !important;
-            border-bottom: 2px solid #D1D5DB !important;
-            padding: 10px 12px !important;
-        }
-        .jardin-scene-panel {
-            flex: 1 1 100% !important;
-            width: 100% !important;
-            max-width: 100% !important;
-            height: 145px !important;
-            min-height: 145px !important;
-        }
-        .jardin-char-wrap {
-            width: 72px !important;
-            height: 100px !important;
-            bottom: 4px !important;
-        }
-        .jardin-char-left {
-            left: 6px !important;
-        }
-        .jardin-char-right {
-            left: 76px !important;
-            right: auto !important;
-        }
         .block-container {
             max-width: 100% !important;
             padding-top: 3.2rem !important;
@@ -2961,11 +2067,11 @@ st.markdown("""
             font-size: 1.65rem !important;
         }
         .stTabs button[data-baseweb="tab"] {
-            padding: 10px 18px !important;
-            min-height: 48px !important;
+            padding: 10px 16px !important;
+            min-height: 46px !important;
         }
         .stTabs button[data-baseweb="tab"] [data-testid="stMarkdownContainer"] p {
-            font-size: 1.05rem !important;
+            font-size: 0.98rem !important;
         }
     }
 </style>
@@ -3069,14 +2175,9 @@ if not st.session_state.autenticado:
     with c2:
         st.markdown("""
         <div class="jardin-login-box">
-            <svg width="80" height="54" viewBox="0 0 80 54" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M40 50V18" stroke="#2D6A4F" stroke-width="3" stroke-linecap="round"/>
-                <path d="M40 36C26 36 16 26 16 12C30 12 40 22 40 36Z" fill="#74C69D" stroke="#2D6A4F" stroke-width="2.2"/>
-                <path d="M40 28C54 28 64 18 64 4C50 4 40 14 40 28Z" fill="#95D5B2" stroke="#2D6A4F" stroke-width="2.2"/>
-                <circle cx="40" cy="12" r="4" fill="#D8B4FE" stroke="#5B4B8A" stroke-width="1.5"/>
-            </svg>
+            <div style="font-size: 2.3rem; line-height: 1;">💳</div>
             <div class="jardin-login-title">Sign in to Finapp</div>
-            <div class="jardin-login-sub">Your personal space for financial clarity</div>
+            <div class="jardin-login-sub">Your personal space for financial clarity (AUD)</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -3084,7 +2185,7 @@ if not st.session_state.autenticado:
             user = st.text_input("Username", value="Julian")
             password = st.text_input("Password", type="password")
             submit = st.form_submit_button(
-                "🌿 Enter Finapp",
+                "Enter Finapp",
                 use_container_width=True
             )
             if submit:
@@ -3256,9 +2357,9 @@ tickers_bon = [
 ]
 
 cotizaciones = obtener_cotizaciones(tuple(tickers_acc), tuple(tickers_cri), tuple(tickers_bon))
-dolar_b = cotizaciones["dolar_blue"]
+usd_to_aud = cotizaciones["usd_to_aud"]
 
-# ----------------- SIDEBAR, SYDNEY TIME, LAST SAVED, REFRESH & LOGOUT -----------------
+# ----------------- SIDEBAR (DATE AT TOP, NO TIME, NO BTC/DOLLAR BLUE, NO "MY PANEL") -----------------
 ahora = datetime.now(TZ_SYDNEY)
 dias = {
     0: "Monday", 1: "Tuesday", 2: "Wednesday", 3: "Thursday",
@@ -3271,8 +2372,7 @@ meses = {
 }
 dia_str = dias[ahora.weekday()]
 mes_str = meses[ahora.month]
-hora_str = ahora.strftime('%H:%M')
-fecha_hora_texto = f"Today is {dia_str}, {mes_str} {ahora.day} - {hora_str}"
+fecha_texto = f"Today is {dia_str}, {mes_str} {ahora.day}"
 ultima_act_texto = calcular_texto_ultima_actualizacion(datos, ahora)
 stamp_archivo = ahora.strftime("%Y-%m-%d_%H-%M")
 
@@ -3287,11 +2387,7 @@ def finalizar_sesion():
 
 
 with st.sidebar:
-    st.markdown(
-        "<h2 style='color: #2D6A4F;'>🌿 My Panel</h2>",
-        unsafe_allow_html=True
-    )
-    st.markdown(f"🗓️ **{fecha_hora_texto}**")
+    st.markdown(f"🗓️ **{fecha_texto}**")
     st.caption(f"🕒 {ultima_act_texto}")
     if st.button("🔄 Refresh", key="btn_sidebar_actualizar", use_container_width=True):
         st.cache_data.clear()
@@ -3305,9 +2401,6 @@ with st.sidebar:
         ]:
             st.session_state.pop(k_reset, None)
         st.rerun()
-    st.markdown("---")
-    st.markdown(f"💵 **Blue Dollar:** `{dolar_b:,.0f} ARS`")
-    st.markdown(f"🪙 **Bitcoin:** `{cotizaciones['BTC']:,.0f} USD`")
     st.markdown("---")
 
     with st.expander("🔐 Recovery Settings"):
@@ -3348,16 +2441,16 @@ with st.sidebar:
             st.toast("✅ Recovery settings updated")
 
     if st.button("🚪 Log Out", use_container_width=True):
-        registrar_snapshot_cierre(datos, dolar_b, cotizaciones)
+        registrar_snapshot_cierre(datos)
         st.session_state.confirmar_cierre = True
         st.rerun()
 
 if st.session_state.confirmar_cierre:
     st.markdown("""
-    <div style="background: linear-gradient(145deg, #EAF6EE 0%, #F3E8FF 100%);
+    <div style="background: linear-gradient(145deg, #F0F9FF 0%, #F3E8FF 100%);
                 border: 2px solid #7E22CE; border-radius: 18px; padding: 20px; margin-bottom: 16px;
                 box-shadow: 0 8px 24px rgba(126, 34, 206, 0.14);">
-        <h3 style="color: #1B4332; margin-top: 0; margin-bottom: 8px;">✅ Your changes have been saved automatically!</h3>
+        <h3 style="color: #0C4A6E; margin-top: 0; margin-bottom: 8px;">✅ Your changes have been saved automatically!</h3>
         <p style="font-size: 1.15rem; color: #374151; font-weight: 700; margin-bottom: 0;">
             Would you like to download a spreadsheet backup before logging out?
         </p>
@@ -3368,7 +2461,7 @@ if st.session_state.confirmar_cierre:
     with col_dl1:
         st.download_button(
             label="📥 YES, DOWNLOAD & LOG OUT",
-            data=generar_excel_bytes(datos, dolar_b, cotizaciones),
+            data=generar_excel_bytes(datos, usd_to_aud, cotizaciones),
             file_name=f"Finapp_{stamp_archivo}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
@@ -3464,9 +2557,10 @@ def mover_categoria_ingreso(idx_actual, direccion):
 
 
 # ----------------- MAIN TABS -----------------
-pestana1, pestana2 = st.tabs([
-    "🍀 COSTS & INCOME",
-    "🍀 TOTAL NET WORTH"
+pestana1, pestana2, pestana3 = st.tabs([
+    "📊 COSTS & INCOME",
+    "💼 TOTAL NET WORTH",
+    "⚡ LIVE CASH FLOW"
 ])
 
 # =========================================================================
@@ -3482,10 +2576,6 @@ with pestana1:
     total_ingresos = sum(i["monto"] for i in ingresos_activos)
 
     saldo_neto = total_ingresos - total_costos
-
-    costos_usd = total_costos / dolar_b if dolar_b > 0 else 0
-    ingresos_usd = total_ingresos / dolar_b if dolar_b > 0 else 0
-    saldo_usd = saldo_neto / dolar_b if dolar_b > 0 else 0
 
     if saldo_neto > 0:
         clase_saldo = "metric-card-lila"
@@ -3505,8 +2595,7 @@ with pestana1:
         st.markdown(f"""
         <div class="metric-card metric-card-costo">
             <div class="kpi-title">Monthly Costs</div>
-            <div class="kpi-value">{total_costos:,.0f} ARS</div>
-            <div class="kpi-usd">≈ {costos_usd:,.2f} USD</div>
+            <div class="kpi-value">${total_costos:,.0f} AUD</div>
             <div class="kpi-sub">{len(costos_activos)} active of {total_items_costos}</div>
         </div>
         """, unsafe_allow_html=True)
@@ -3515,8 +2604,7 @@ with pestana1:
         st.markdown(f"""
         <div class="metric-card metric-card-ingreso">
             <div class="kpi-title">Monthly Income</div>
-            <div class="kpi-value">{total_ingresos:,.0f} ARS</div>
-            <div class="kpi-usd">≈ {ingresos_usd:,.2f} USD</div>
+            <div class="kpi-value">${total_ingresos:,.0f} AUD</div>
             <div class="kpi-sub">{len(ingresos_activos)} active of {total_items_ingresos}</div>
         </div>
         """, unsafe_allow_html=True)
@@ -3525,8 +2613,7 @@ with pestana1:
         st.markdown(f"""
         <div class="metric-card {clase_saldo}">
             <div class="kpi-title">Monthly Savings {carita}</div>
-            <div class="kpi-value">{saldo_neto:,.0f} ARS</div>
-            <div class="kpi-usd">≈ {saldo_usd:,.2f} USD</div>
+            <div class="kpi-value">${saldo_neto:,.0f} AUD</div>
             <div class="kpi-sub">{sub_saldo}</div>
         </div>
         """, unsafe_allow_html=True)
@@ -3561,11 +2648,10 @@ with pestana1:
                 (idx, item) for idx, item in enumerate(datos["costos"])
                 if item.get("grupo", "HOME & OTHERS") == cat_nombre
             ]
-            sub_ars = sum(i["monto"] for _, i in items_cat if i.get("activo", True))
-            sub_usd = sub_ars / dolar_b if dolar_b > 0 else 0
+            sub_aud = sum(i["monto"] for _, i in items_cat if i.get("activo", True))
             icono_cat = datos.get("iconos_costos", {}).get(cat_nombre, predecir_icono_categoria(cat_nombre, "costo"))
 
-            titulo_cat = f"{icono_cat} **{cat_nombre}** — subt= **{sub_ars:,.0f} ARS** ({sub_usd:,.1f} USD)"
+            titulo_cat = f"{icono_cat} **{cat_nombre}** — subt= **${sub_aud:,.0f} AUD**"
             col_exp_c, col_arrows_c = st.columns([0.94, 0.06], gap="small")
             with col_arrows_c:
                 st.markdown("<div class='flechas-cat-stack'></div>", unsafe_allow_html=True)
@@ -3617,7 +2703,7 @@ with pestana1:
                     h1, h2, h3, h4 = st.columns([0.58, 2.35, 1.45, 0.55])
                     h1.markdown("<div class='col-header'>ACT.</div>", unsafe_allow_html=True)
                     h2.markdown("<div class='col-header'>SUBCATEGORY</div>", unsafe_allow_html=True)
-                    h3.markdown("<div class='col-header'>AMOUNT (ARS)</div>", unsafe_allow_html=True)
+                    h3.markdown("<div class='col-header'>AMOUNT (AUD)</div>", unsafe_allow_html=True)
                     h4.markdown("<div class='col-header'>DEL</div>", unsafe_allow_html=True)
 
                 for idx, item in items_cat:
@@ -3676,8 +2762,8 @@ with pestana1:
                         )
                     with sc2:
                         sub_val_c = st.text_input(
-                            "Amount ARS",
-                            placeholder="Amount ARS",
+                            "Amount AUD",
+                            placeholder="Amount AUD",
                             label_visibility="collapsed"
                         )
                     with sc3:
@@ -3737,11 +2823,10 @@ with pestana1:
                 (idx, item) for idx, item in enumerate(datos["ingresos"])
                 if item.get("grupo", "Other Income") == cat_nombre_i
             ]
-            sub_ars_i = sum(i["monto"] for _, i in items_cat_i if i.get("activo", True))
-            sub_usd_i = sub_ars_i / dolar_b if dolar_b > 0 else 0
+            sub_aud_i = sum(i["monto"] for _, i in items_cat_i if i.get("activo", True))
             icono_cat_i = datos.get("iconos_ingresos", {}).get(cat_nombre_i, predecir_icono_categoria(cat_nombre_i, "ingreso"))
 
-            titulo_cat_i = f"{icono_cat_i} **{cat_nombre_i}** — subt= **{sub_ars_i:,.0f} ARS** ({sub_usd_i:,.1f} USD)"
+            titulo_cat_i = f"{icono_cat_i} **{cat_nombre_i}** — subt= **${sub_aud_i:,.0f} AUD**"
             col_exp_i, col_arrows_i = st.columns([0.94, 0.06], gap="small")
             with col_arrows_i:
                 st.markdown("<div class='flechas-cat-stack'></div>", unsafe_allow_html=True)
@@ -3793,7 +2878,7 @@ with pestana1:
                     hi1, hi2, hi3, hi4 = st.columns([0.58, 2.35, 1.45, 0.55])
                     hi1.markdown("<div class='col-header'>ACT.</div>", unsafe_allow_html=True)
                     hi2.markdown("<div class='col-header'>SUBCATEGORY</div>", unsafe_allow_html=True)
-                    hi3.markdown("<div class='col-header'>AMOUNT (ARS)</div>", unsafe_allow_html=True)
+                    hi3.markdown("<div class='col-header'>AMOUNT (AUD)</div>", unsafe_allow_html=True)
                     hi4.markdown("<div class='col-header'>DEL</div>", unsafe_allow_html=True)
 
                 for idx, item in items_cat_i:
@@ -3852,8 +2937,8 @@ with pestana1:
                         )
                     with si2:
                         sub_val_i = st.text_input(
-                            "Amount ARS",
-                            placeholder="Amount ARS",
+                            "Amount AUD",
+                            placeholder="Amount AUD",
                             label_visibility="collapsed"
                         )
                     with si3:
@@ -3922,15 +3007,13 @@ with pestana1:
                 titulo_col_c = "Subcategory"
                 fig_c = crear_barras_horizontales(df_pie_c, "monto", col_label_c)
 
-            df_pie_c["USD"] = df_pie_c["monto"] / dolar_b
             df_pie_c["Percentage"] = (df_pie_c["monto"] / total_costos) * 100
 
             st.plotly_chart(fig_c, use_container_width=True, config={"displayModeBar": False})
 
-            tabla_c = df_pie_c[[col_label_c, "monto", "USD", "Percentage"]].copy()
-            tabla_c.columns = [titulo_col_c, "Subtotal (ARS)", "Subtotal (USD)", "% of Total"]
-            tabla_c["Subtotal (ARS)"] = tabla_c["Subtotal (ARS)"].apply(lambda x: f"{x:,.0f} ARS")
-            tabla_c["Subtotal (USD)"] = tabla_c["Subtotal (USD)"].apply(lambda x: f"{x:,.2f} USD")
+            tabla_c = df_pie_c[[col_label_c, "monto", "Percentage"]].copy()
+            tabla_c.columns = [titulo_col_c, "Subtotal (AUD)", "% of Total"]
+            tabla_c["Subtotal (AUD)"] = tabla_c["Subtotal (AUD)"].apply(lambda x: f"${x:,.0f} AUD")
             tabla_c["% of Total"] = tabla_c["% of Total"].apply(lambda x: f"{x:.1f}%")
             st.dataframe(tabla_c, use_container_width=True, hide_index=True)
         else:
@@ -3955,15 +3038,13 @@ with pestana1:
                 titulo_col_i = "Subcategory"
                 fig_i = crear_barras_horizontales(df_pie_i, "monto", col_label_i)
 
-            df_pie_i["USD"] = df_pie_i["monto"] / dolar_b
             df_pie_i["Percentage"] = (df_pie_i["monto"] / total_ingresos) * 100
 
             st.plotly_chart(fig_i, use_container_width=True, config={"displayModeBar": False})
 
-            tabla_i = df_pie_i[[col_label_i, "monto", "USD", "Percentage"]].copy()
-            tabla_i.columns = [titulo_col_i, "Subtotal (ARS)", "Subtotal (USD)", "% of Total"]
-            tabla_i["Subtotal (ARS)"] = tabla_i["Subtotal (ARS)"].apply(lambda x: f"{x:,.0f} ARS")
-            tabla_i["Subtotal (USD)"] = tabla_i["Subtotal (USD)"].apply(lambda x: f"{x:,.2f} USD")
+            tabla_i = df_pie_i[[col_label_i, "monto", "Percentage"]].copy()
+            tabla_i.columns = [titulo_col_i, "Subtotal (AUD)", "% of Total"]
+            tabla_i["Subtotal (AUD)"] = tabla_i["Subtotal (AUD)"].apply(lambda x: f"${x:,.0f} AUD")
             tabla_i["% of Total"] = tabla_i["% of Total"].apply(lambda x: f"{x:.1f}%")
             st.dataframe(tabla_i, use_container_width=True, hide_index=True)
         else:
@@ -3983,96 +3064,56 @@ with pestana2:
 
     for inv in inversiones:
         cant = float(inv.get("cantidad", 0))
-        tipo = normalizar_tipo_activo_inv(inv.get("tipo", "Pesos ARS"))
+        tipo = normalizar_tipo_activo_inv(inv.get("tipo", "Cash AUD"))
         activo_nom = str(inv.get("activo", tipo)).strip()
-        if activo_nom in ["Dólar Billete", "A - Dólar Billete"]:
-            activo_nom = "Dólares USD"
+        if activo_nom in ["Pesos ARS", "Dólar Billete", "A - Dólar Billete"]:
+            activo_nom = "Cash AUD" if tipo == "Cash AUD" else "Cash USD"
 
         simbolo = str(inv.get("simbolo", "")).upper().strip().split(" ")[0]
         if tipo in ["Cryptos", "Stocks", "Bonds"]:
             det_t = activo_nom.split(" ")[0].upper()
-            if det_t and det_t not in ["USD", "ARS"]:
+            if det_t and det_t not in ["USD", "ARS", "AUD"]:
                 simbolo = det_t
 
         esta_activo = inv.get("activo_inv", True)
         precio_valido = True
 
-        if tipo == "Pesos ARS":
-            precio_unit_ars = 1.0
-            val_ars = cant
-            val_usd = cant / dolar_b if dolar_b > 0 else 0.0
-            cotiz_actual_str = f"1 USD = {dolar_b:,.0f} ARS"
-        elif tipo == "Dólares USD":
-            precio_unit_ars = dolar_b
-            val_usd = cant
-            val_ars = cant * dolar_b
-            cotiz_actual_str = f"1 USD = {dolar_b:,.0f} ARS"
-        elif tipo == "Cryptos":
-            precio_u = cotizaciones.get(simbolo)
-            if precio_u is None or float(precio_u) <= 0:
+        if tipo == "Cash AUD":
+            precio_unit_aud = 1.0
+            val_aud = cant
+            cotiz_actual_str = "1 AUD = 1.00 AUD"
+        elif tipo == "Cash USD":
+            precio_unit_aud = usd_to_aud
+            val_aud = cant * usd_to_aud
+            cotiz_actual_str = f"1 USD = {usd_to_aud:,.2f} AUD"
+        elif tipo in ["Cryptos", "Stocks"]:
+            precio_u_usd = cotizaciones.get(simbolo)
+            if precio_u_usd is None or float(precio_u_usd) <= 0:
                 precio_valido = False
-                precio_unit_ars = 0.0
-                val_usd = 0.0
-                val_ars = 0.0
+                precio_unit_aud = 0.0
+                val_aud = 0.0
                 cotiz_actual_str = f"⚠️ No quote for {simbolo}"
                 if esta_activo:
                     advertencias_precios.append(f"{activo_nom} ({tipo})")
             else:
-                precio_u = float(precio_u)
-                precio_unit_ars = precio_u * dolar_b
-                val_usd = cant * precio_u
-                val_ars = cant * precio_unit_ars
-                cotiz_actual_str = f"1 {simbolo} = {precio_u:,.2f} USD ({precio_unit_ars:,.0f} ARS)"
-        elif tipo == "Stocks":
-            precio_u = cotizaciones.get(simbolo)
-            if precio_u is None or float(precio_u) <= 0:
-                precio_valido = False
-                precio_unit_ars = 0.0
-                val_usd = 0.0
-                val_ars = 0.0
-                cotiz_actual_str = f"⚠️ No quote for {simbolo}"
-                if esta_activo:
-                    advertencias_precios.append(f"{activo_nom} ({tipo})")
-            else:
-                precio_u = float(precio_u)
-                precio_unit_ars = precio_u * dolar_b
-                val_usd = cant * precio_u
-                val_ars = cant * precio_unit_ars
-                cotiz_actual_str = f"1 {simbolo} = {precio_u:,.2f} USD ({precio_unit_ars:,.0f} ARS)"
-        elif tipo == "Bonds":
-            precio_bono = cotizaciones.get(f"BONO_ARS_{simbolo}", inv.get("precio_unitario_ars"))
-            if precio_bono is None or float(precio_bono) <= 0:
-                precio_valido = False
-                precio_unit_ars = 0.0
-                val_ars = 0.0
-                val_usd = 0.0
-                cotiz_actual_str = f"⚠️ No quote for {simbolo}"
-                if esta_activo:
-                    advertencias_precios.append(f"{activo_nom} ({tipo})")
-            else:
-                precio_unit_ars = float(precio_bono)
-                val_ars = cant * precio_unit_ars
-                val_usd = val_ars / dolar_b if dolar_b > 0 else 0.0
-                cotiz_actual_str = f"1 {simbolo} = {precio_unit_ars:,.0f} ARS ({precio_unit_ars / dolar_b if dolar_b > 0 else 0:,.2f} USD)"
+                precio_unit_aud = float(precio_u_usd) * usd_to_aud
+                val_aud = cant * precio_unit_aud
+                cotiz_actual_str = f"1 {simbolo} = ${precio_unit_aud:,.2f} AUD"
         else:
-            if simbolo and simbolo not in ["ARS", "USD"] and simbolo in cotizaciones and float(cotizaciones[simbolo]) > 0:
-                precio_unit_ars = float(cotizaciones[simbolo]) * dolar_b
-                cotiz_actual_str = f"1 {simbolo} = {precio_unit_ars:,.0f} ARS"
-            elif f"BONO_ARS_{simbolo}" in cotizaciones and float(cotizaciones[f"BONO_ARS_{simbolo}"]) > 0:
-                precio_unit_ars = float(cotizaciones[f"BONO_ARS_{simbolo}"])
-                cotiz_actual_str = f"1 {simbolo} = {precio_unit_ars:,.0f} ARS"
+            if simbolo and simbolo not in ["AUD", "USD", "ARS"] and simbolo in cotizaciones and float(cotizaciones[simbolo]) > 0:
+                precio_unit_aud = float(cotizaciones[simbolo]) * usd_to_aud
+                cotiz_actual_str = f"1 {simbolo} = ${precio_unit_aud:,.2f} AUD"
             else:
-                precio_unit_ars = float(inv.get("precio_unitario_ars", 1.0))
-                if precio_unit_ars <= 0:
+                precio_unit_aud = float(inv.get("precio_unitario_aud", 1.0))
+                if precio_unit_aud <= 0:
                     precio_valido = False
-                    precio_unit_ars = 0.0
+                    precio_unit_aud = 0.0
                     cotiz_actual_str = "⚠️ Invalid price"
                     if esta_activo:
                         advertencias_precios.append(f"{activo_nom} ({tipo})")
                 else:
-                    cotiz_actual_str = f"1 unit = {precio_unit_ars:,.0f} ARS" if precio_unit_ars != 1.0 else f"1 USD = {dolar_b:,.0f} ARS"
-            val_ars = cant * precio_unit_ars if precio_valido else 0.0
-            val_usd = (val_ars / dolar_b if dolar_b > 0 else 0.0) if precio_valido else 0.0
+                    cotiz_actual_str = f"1 unit = ${precio_unit_aud:,.2f} AUD"
+            val_aud = cant * precio_unit_aud if precio_valido else 0.0
 
         filas.append({
             "Type": tipo,
@@ -4081,11 +3122,10 @@ with pestana2:
             "Platform": inv.get("plataforma", ""),
             "Quantity_Num": cant,
             "Quantity": formatear_cant(cant),
-            "Price_Unit_ARS": precio_unit_ars,
+            "Price_Unit_AUD": precio_unit_aud,
             "Price_Valid": precio_valido,
             "Live Quote": cotiz_actual_str,
-            "Value (ARS)": val_ars,
-            "Value (USD)": val_usd,
+            "Value (AUD)": val_aud,
             "Active_Flag": esta_activo
         })
 
@@ -4102,59 +3142,20 @@ with pestana2:
     else:
         df_inv_activos = pd.DataFrame()
 
-    total_patrimonio_ars = df_inv_activos["Value (ARS)"].sum() if not df_inv_activos.empty else 0
-    total_patrimonio_usd = df_inv_activos["Value (USD)"].sum() if not df_inv_activos.empty else 0
+    total_patrimonio_aud = df_inv_activos["Value (AUD)"].sum() if not df_inv_activos.empty else 0.0
 
     costos_activos_live = [c for c in datos.get("costos", []) if c.get("activo", True)]
     ingresos_activos_live = [i for i in datos.get("ingresos", []) if i.get("activo", True)]
-
-    costo_mensual_vivir_ars = 0.0
-    hay_costo_usd = False
-    for c_item in costos_activos_live:
-        monto_c = float(c_item.get("monto", 0))
-        moneda_c = str(c_item.get("moneda", "ARS")).upper().strip()
-        if moneda_c == "USD":
-            hay_costo_usd = True
-            costo_mensual_vivir_ars += monto_c * dolar_b if dolar_b and dolar_b > 0 else 0.0
-        else:
-            costo_mensual_vivir_ars += monto_c
-
-    ingreso_mensual_vivir_ars = 0.0
-    hay_ingreso_usd = False
-    for i_item in ingresos_activos_live:
-        monto_i = float(i_item.get("monto", 0))
-        moneda_i = str(i_item.get("moneda", "ARS")).upper().strip()
-        if moneda_i == "USD":
-            hay_ingreso_usd = True
-            ingreso_mensual_vivir_ars += monto_i * dolar_b if dolar_b and dolar_b > 0 else 0.0
-        else:
-            ingreso_mensual_vivir_ars += monto_i
-
-    hay_activo_usd = any(
-        inv.get("activo_inv", True) and normalizar_tipo_activo_inv(inv.get("tipo")) in ["Dólares USD", "Cryptos", "Stocks"]
-        for inv in inversiones
-    )
-    hay_moneda_ext = hay_costo_usd or hay_ingreso_usd or hay_activo_usd
+    costo_mensual_vivir_aud = sum(float(c_item.get("monto", 0)) for c_item in costos_activos_live)
+    ingreso_mensual_vivir_aud = sum(float(i_item.get("monto", 0)) for i_item in ingresos_activos_live)
     datos_cyi_faltantes = (not costos_activos_live) or (not ingresos_activos_live)
 
-    if not dolar_b or dolar_b <= 0:
-        dolar_b = st.number_input(
-            "USD to ARS Exchange Rate (required to unify currency in ARS):",
-            min_value=1.0,
-            value=1575.0,
-            step=10.0,
-            key="input_tasa_cambio_fallback"
-        )
-
     html_panel_salud = construir_html_panel_patrimonio(
-        total_patrimonio_ars=total_patrimonio_ars,
-        total_patrimonio_usd=total_patrimonio_usd,
+        total_patrimonio_aud=total_patrimonio_aud,
         cant_activos_contemplados=len(df_inv_activos),
         cant_activos_totales=len(inversiones),
-        ingreso_mensual_ars=ingreso_mensual_vivir_ars,
-        costo_mensual_ars=costo_mensual_vivir_ars,
-        dolar_b=dolar_b,
-        hay_moneda_extranjera=hay_moneda_ext,
+        ingreso_mensual_aud=ingreso_mensual_vivir_aud,
+        costo_mensual_aud=costo_mensual_vivir_aud,
         datos_faltantes=datos_cyi_faltantes
     )
     st.markdown(html_panel_salud, unsafe_allow_html=True)
@@ -4170,8 +3171,8 @@ with pestana2:
             unsafe_allow_html=True
         )
         opciones_tipo = [
-            "A - Pesos ARS",
-            "B - Dólares USD",
+            "A - Cash AUD",
+            "B - Cash USD",
             "C - Stocks",
             "D - Cryptos",
             "E - Bonds",
@@ -4188,7 +3189,7 @@ with pestana2:
         datos["ubicaciones_guardadas"] = opciones_ubicacion
 
         ult_sel = datos.setdefault("ultimas_selecciones_inv", {
-            "tipo": "A - Pesos ARS",
+            "tipo": "A - Cash AUD",
             "accion": "AAPL (Apple)",
             "cripto": "BTC (Bitcoin)",
             "bono": "AL30 (Bonar 2030 Ley Arg.)",
@@ -4199,9 +3200,9 @@ with pestana2:
             for k_sync, v_sync in st.session_state.pop("_pending_inv_widget_sync").items():
                 st.session_state[k_sync] = v_sync
 
-        tipo_guardado = ult_sel.get("tipo", "A - Pesos ARS")
+        tipo_guardado = ult_sel.get("tipo", "A - Cash AUD")
         if tipo_guardado not in opciones_tipo:
-            tipo_guardado = "A - Pesos ARS"
+            tipo_guardado = "A - Cash AUD"
 
         if "inv_tipo_select" not in st.session_state or st.session_state["inv_tipo_select"] not in opciones_tipo:
             st.session_state["inv_tipo_select"] = tipo_guardado
@@ -4218,7 +3219,7 @@ with pestana2:
         )
 
         contenedor_selector_especifico = st.container()
-        simbolo_elegido = "ARS"
+        simbolo_elegido = "AUD"
         detalle_manual = ""
 
         with contenedor_selector_especifico:
@@ -4243,7 +3244,7 @@ with pestana2:
                     on_change=on_cambio_accion_inv
                 )
                 detalle_manual = st.text_input(
-                    "Not in the list? Type ticker manually to save it (e.g. DIS, V):",
+                    "Not in the list? Type ticker manually to save it (e.g. VAS.AX, DIS):",
                     key="inv_detalle_manual_acc"
                 )
             elif tipo_elegido == "D - Cryptos":
@@ -4296,7 +3297,7 @@ with pestana2:
                 )
             elif tipo_elegido == "F - FCI":
                 detalle_manual = st.text_input(
-                    "Fund name or ticker (e.g. Fima Premium):",
+                    "Fund name or ticker:",
                     key="inv_detalle_manual_fci"
                 )
             elif tipo_elegido == "G - Others":
@@ -4340,20 +3341,20 @@ with pestana2:
             on_change=on_enter_nueva_ubicacion
         )
 
-        if tipo_elegido == "A - Pesos ARS":
-            tooltip_cant_actual = "Enter the amount in Argentine Pesos. e.g. 2500000"
-        elif tipo_elegido == "B - Dólares USD":
+        if tipo_elegido == "A - Cash AUD":
+            tooltip_cant_actual = "Enter the amount in Australian Dollars (AUD). e.g. 2500"
+        elif tipo_elegido == "B - Cash USD":
             tooltip_cant_actual = "Enter the amount in US Dollars. e.g. 1500"
         else:
             tooltip_cant_actual = (
                 "Enter the number of units, not the cash value. "
-                "e.g. 2 or 5 (stocks/bonds), 0.0005 (BTC). Value is calculated automatically."
+                "e.g. 2 or 5 (stocks/bonds), 0.0005 (BTC). Value in AUD is calculated automatically."
             )
 
         with st.form("form_guardar_activo_inv", clear_on_submit=True):
             cant_texto = st.text_input(
                 "3. Quantity Held",
-                placeholder="e.g. 40000 or 0.0005",
+                placeholder="e.g. 2500 or 0.0005",
                 help=tooltip_cant_actual
             )
             btn_guardar_inv = st.form_submit_button(
@@ -4370,13 +3371,13 @@ with pestana2:
                 if cant_num > 0:
                     tipo_momento_guardar = st.session_state.get("inv_tipo_select", tipo_elegido)
 
-                    if tipo_momento_guardar == "A - Pesos ARS":
-                        tipo_guardar = "Pesos ARS"
-                        nombre_act = "Pesos ARS"
-                        simbolo_final = "ARS"
-                    elif tipo_momento_guardar == "B - Dólares USD":
-                        tipo_guardar = "Dólares USD"
-                        nombre_act = "Dólares USD"
+                    if tipo_momento_guardar == "A - Cash AUD":
+                        tipo_guardar = "Cash AUD"
+                        nombre_act = "Cash AUD"
+                        simbolo_final = "AUD"
+                    elif tipo_momento_guardar == "B - Cash USD":
+                        tipo_guardar = "Cash USD"
+                        nombre_act = "Cash USD"
                         simbolo_final = "USD"
                     elif tipo_momento_guardar == "C - Stocks":
                         tipo_guardar = "Stocks"
@@ -4450,7 +3451,7 @@ with pestana2:
                     else:
                         tipo_guardar = "Others"
                         nombre_act = detalle_manual.strip() if detalle_manual.strip() else "Others"
-                        simbolo_final = nombre_act.split(" ")[0].upper() if detalle_manual.strip() else "ARS"
+                        simbolo_final = nombre_act.split(" ")[0].upper() if detalle_manual.strip() else "AUD"
                         if detalle_manual.strip():
                             st.session_state["_pending_inv_widget_sync"] = {
                                 "inv_detalle_manual_otros": ""
@@ -4489,8 +3490,8 @@ with pestana2:
             unsafe_allow_html=True
         )
         orden_categorias_inv = [
-            "Pesos ARS",
-            "Dólares USD",
+            "Cash AUD",
+            "Cash USD",
             "Stocks",
             "Cryptos",
             "Bonds",
@@ -4508,20 +3509,15 @@ with pestana2:
                 if not items_cat_inv:
                     continue
 
-                sub_inv_ars = sum(
-                    filas[idx]["Value (ARS)"]
-                    for idx, inv in items_cat_inv
-                    if inv.get("activo_inv", True)
-                )
-                sub_inv_usd = sum(
-                    filas[idx]["Value (USD)"]
+                sub_inv_aud = sum(
+                    filas[idx]["Value (AUD)"]
                     for idx, inv in items_cat_inv
                     if inv.get("activo_inv", True)
                 )
 
                 titulo_exp_inv = (
                     f"📂 **{cat_inv}** — subt= "
-                    f"**{sub_inv_ars:,.0f} ARS** ({sub_inv_usd:,.2f} USD)"
+                    f"**${sub_inv_aud:,.2f} AUD**"
                 )
                 with st.expander(titulo_exp_inv, expanded=True):
                     hc1, hc2, hc3, hc4, hc5 = st.columns([0.45, 1.15, 1.85, 1.10, 0.45])
@@ -4547,10 +3543,9 @@ with pestana2:
                                 inv_cambios = True
 
                         with c_nom:
-                            val_detalle_mostrar = "Dólares USD" if inv.get("activo", "") in ["Dólar Billete", "A - Dólar Billete"] else inv.get("activo", "")
                             st.text_input(
                                 "Detail",
-                                value=val_detalle_mostrar,
+                                value=filas[idx]["Asset"],
                                 key=f"inv_nom_{idx}",
                                 label_visibility="collapsed",
                                 disabled=True
@@ -4576,7 +3571,7 @@ with pestana2:
                             except ValueError:
                                 pass
 
-                            if cat_inv not in ["Pesos ARS", "Dólares USD"]:
+                            if cat_inv != "Cash AUD":
                                 if not filas[idx].get("Price_Valid", True):
                                     st.markdown(
                                         "<div style='font-size: 0.75rem; font-weight: 700; color: #991B1B; "
@@ -4588,20 +3583,16 @@ with pestana2:
                                         unsafe_allow_html=True
                                     )
                                 else:
-                                    precio_u_ars_fila = float(filas[idx]["Price_Unit_ARS"])
-                                    total_ars_fila = cant_num_actual * precio_u_ars_fila
-                                    precio_u_fmt = (
-                                        f"{precio_u_ars_fila:,.0f}"
-                                        if precio_u_ars_fila >= 10 or precio_u_ars_fila.is_integer()
-                                        else f"{precio_u_ars_fila:,.2f}"
-                                    )
+                                    precio_u_aud_fila = float(filas[idx]["Price_Unit_AUD"])
+                                    total_aud_fila = cant_num_actual * precio_u_aud_fila
+                                    precio_u_fmt = f"{precio_u_aud_fila:,.2f}"
                                     st.markdown(
                                         f"<div style='font-size: 0.75rem; font-weight: 700; color: #4A235A; "
                                         f"background: #F5F3FF; border: 1px solid #DDD6FE; border-radius: 7px; "
                                         f"padding: 4px 7px; margin-top: -8px; margin-bottom: 6px; "
                                         f"white-space: normal; word-break: break-word; overflow-wrap: anywhere; "
                                         f"line-height: 1.25;'>"
-                                        f"{cant_str_actual} × {precio_u_fmt} = {total_ars_fila:,.0f} ARS"
+                                        f"{cant_str_actual} × ${precio_u_fmt} = ${total_aud_fila:,.2f} AUD"
                                         f"</div>",
                                         unsafe_allow_html=True
                                     )
@@ -4633,7 +3624,7 @@ with pestana2:
         "<h3 style='color: #5B4B8A;'>💼 Net Worth Breakdown</h3>",
         unsafe_allow_html=True
     )
-    if not df_inv_activos.empty and total_patrimonio_ars > 0:
+    if not df_inv_activos.empty and total_patrimonio_aud > 0:
         col_g_inv1, col_g_inv2 = st.columns(2, gap="medium")
 
         with col_g_inv1:
@@ -4642,18 +3633,16 @@ with pestana2:
                 unsafe_allow_html=True
             )
             resumen_tipo = df_inv_activos.groupby("Type", as_index=False).agg({
-                "Value (ARS)": "sum",
-                "Value (USD)": "sum"
-            }).sort_values(by="Value (ARS)", ascending=False)
-            resumen_tipo["%"] = (resumen_tipo["Value (ARS)"] / total_patrimonio_ars) * 100
+                "Value (AUD)": "sum"
+            }).sort_values(by="Value (AUD)", ascending=False)
+            resumen_tipo["%"] = (resumen_tipo["Value (AUD)"] / total_patrimonio_aud) * 100
 
-            fig_inv_tipo = crear_torta_2d(resumen_tipo, "Value (ARS)", "Type")
+            fig_inv_tipo = crear_torta_2d(resumen_tipo, "Value (AUD)", "Type")
             st.plotly_chart(fig_inv_tipo, use_container_width=True, config={"displayModeBar": False})
 
             tabla_t = resumen_tipo.copy()
-            tabla_t.columns = ["Category", "Subtotal (ARS)", "Subtotal (USD)", "%"]
-            tabla_t["Subtotal (ARS)"] = tabla_t["Subtotal (ARS)"].apply(lambda x: f"{x:,.0f} ARS")
-            tabla_t["Subtotal (USD)"] = tabla_t["Subtotal (USD)"].apply(lambda x: f"{x:,.2f} USD")
+            tabla_t.columns = ["Category", "Subtotal (AUD)", "%"]
+            tabla_t["Subtotal (AUD)"] = tabla_t["Subtotal (AUD)"].apply(lambda x: f"${x:,.2f} AUD")
             tabla_t["%"] = tabla_t["%"].apply(lambda x: f"{x:.1f}%")
             st.dataframe(tabla_t, use_container_width=True, hide_index=True)
 
@@ -4662,8 +3651,8 @@ with pestana2:
                 "<h4 style='color: #5B4B8A; text-align: center;'>By Location</h4>",
                 unsafe_allow_html=True
             )
-            df_det = df_inv_activos.sort_values(by="Value (ARS)", ascending=False).copy()
-            df_det["%"] = (df_det["Value (ARS)"] / total_patrimonio_ars) * 100
+            df_det = df_inv_activos.sort_values(by="Value (AUD)", ascending=False).copy()
+            df_det["%"] = (df_det["Value (AUD)"] / total_patrimonio_aud) * 100
 
             df_ubic_grp = df_inv_activos.copy()
             df_ubic_grp["Ubicacion_Limpia"] = df_ubic_grp["Platform"].astype(str).str.strip()
@@ -4677,25 +3666,23 @@ with pestana2:
             df_ubic_grp["Ubicacion_Final"] = df_ubic_grp["Ubicacion_Limpia"].apply(lambda x: mapa_ubic_display.get(x.lower(), x))
 
             resumen_ubic = df_ubic_grp.groupby("Ubicacion_Final", as_index=False).agg({
-                "Value (ARS)": "sum",
-                "Value (USD)": "sum"
-            }).sort_values(by="Value (ARS)", ascending=False)
-            resumen_ubic["%"] = (resumen_ubic["Value (ARS)"] / total_patrimonio_ars) * 100
+                "Value (AUD)": "sum"
+            }).sort_values(by="Value (AUD)", ascending=False)
+            resumen_ubic["%"] = (resumen_ubic["Value (AUD)"] / total_patrimonio_aud) * 100
 
             menores_2pct = resumen_ubic[resumen_ubic["%"] < 2.0]
             if len(menores_2pct) > 1:
                 mayores_2pct = resumen_ubic[resumen_ubic["%"] >= 2.0].copy()
                 fila_otras = pd.DataFrame([{
                     "Ubicacion_Final": "Other",
-                    "Value (ARS)": menores_2pct["Value (ARS)"].sum(),
-                    "Value (USD)": menores_2pct["Value (USD)"].sum(),
+                    "Value (AUD)": menores_2pct["Value (AUD)"].sum(),
                     "%": menores_2pct["%"].sum()
                 }])
                 df_pie_ubic = pd.concat([mayores_2pct, fila_otras], ignore_index=True)
             else:
                 df_pie_ubic = resumen_ubic.copy()
 
-            fig_inv_det = crear_torta_2d(df_pie_ubic, "Value (ARS)", "Ubicacion_Final")
+            fig_inv_det = crear_torta_2d(df_pie_ubic, "Value (AUD)", "Ubicacion_Final")
             st.plotly_chart(fig_inv_det, use_container_width=True, config={"displayModeBar": False})
 
             activos_unicos = list(dict.fromkeys(df_det["Asset"].dropna().astype(str).tolist()))
@@ -4709,7 +3696,7 @@ with pestana2:
                     opciones_filtro.append(u_item)
 
             filtro_sel = st.selectbox(
-                "🔎 Filter by Asset or Location (e.g. BTC, Nexo, Binance):",
+                "🔎 Filter by Asset or Location (e.g. BTC, Up Bank, Binance):",
                 options=opciones_filtro,
                 key="filtro_tabla_final_inv"
             )
@@ -4728,21 +3715,19 @@ with pestana2:
 
             cols_d = [
                 "Type", "Asset", "Platform", "Quantity",
-                "Live Quote", "Value (ARS)", "Value (USD)", "%"
+                "Live Quote", "Value (AUD)", "%"
             ]
             tabla_d = df_det_mostrar[cols_d].copy()
             tabla_d.columns = [
                 "Category", "Asset", "Location", "Quantity",
-                "Live Quote Used", "Value (ARS)", "Value (USD)", "%"
+                "Live Quote Used", "Value (AUD)", "%"
             ]
-            tabla_d["Value (ARS)"] = tabla_d["Value (ARS)"].apply(lambda x: f"{x:,.0f} ARS")
-            tabla_d["Value (USD)"] = tabla_d["Value (USD)"].apply(lambda x: f"{x:,.2f} USD")
+            tabla_d["Value (AUD)"] = tabla_d["Value (AUD)"].apply(lambda x: f"${x:,.2f} AUD")
             tabla_d["%"] = tabla_d["%"].apply(lambda x: f"{x:.1f}%")
 
             if filtro_sel != "All (show all)" and not df_det_mostrar.empty:
-                sub_f_ars = df_det_mostrar["Value (ARS)"].sum()
-                sub_f_usd = df_det_mostrar["Value (USD)"].sum()
-                sub_f_pct = (sub_f_ars / total_patrimonio_ars) * 100 if total_patrimonio_ars > 0 else 0.0
+                sub_f_aud = df_det_mostrar["Value (AUD)"].sum()
+                sub_f_pct = (sub_f_aud / total_patrimonio_aud) * 100 if total_patrimonio_aud > 0 else 0.0
                 cant_f_total = df_det_mostrar["Quantity_Num"].sum()
                 es_mismo_activo = df_det_mostrar["Asset"].nunique() == 1
                 cant_f_str = formatear_cant(cant_f_total) if es_mismo_activo else f"{len(df_det_mostrar)} items"
@@ -4753,8 +3738,7 @@ with pestana2:
                     "Location": "Filtered total",
                     "Quantity": cant_f_str,
                     "Live Quote Used": "—",
-                    "Value (ARS)": f"{sub_f_ars:,.0f} ARS",
-                    "Value (USD)": f"{sub_f_usd:,.2f} USD",
+                    "Value (AUD)": f"${sub_f_aud:,.2f} AUD",
                     "%": f"{sub_f_pct:.1f}%"
                 }])
                 tabla_d = pd.concat([tabla_d, fila_subtotal], ignore_index=True)
@@ -4762,13 +3746,24 @@ with pestana2:
                 st.markdown(f"""
                 <div style="background-color: #F3E8FF; border: 1.5px solid #C084FC; border-left: 6px solid #7E22CE;
                             border-radius: 12px; padding: 10px 14px; margin-bottom: 10px; color: #4A235A; font-size: 0.98rem;">
-                    <b>Subtotal ({filtro_sel}):</b> <b>{sub_f_usd:,.2f} USD</b> &nbsp;|&nbsp;
-                    <b>{sub_f_ars:,.0f} ARS</b> &nbsp;|&nbsp;
+                    <b>Subtotal ({filtro_sel}):</b> <b>${sub_f_aud:,.2f} AUD</b> &nbsp;|&nbsp;
                     <b>{sub_f_pct:.1f}%</b> of total net worth
                 </div>
                 """, unsafe_allow_html=True)
 
             st.dataframe(tabla_d, use_container_width=True, hide_index=True)
+
+
+# =========================================================================
+# ============================= TAB 3 =====================================
+# =========================================================================
+with pestana3:
+    st.markdown("<h3 style='color: #0C4A6E;'>⚡ Live Cash Flow (Bank Sync)</h3>", unsafe_allow_html=True)
+    st.info(
+        "Ready for your live **Up Bank** connection! In the next step, we'll connect your "
+        "Personal Access Token here so every tap-and-pay expense and salary deposit (ME Group, "
+        "CG Recruitment, Pinnacle People, Parkhount, and flatmate rent/bills) loads automatically in AUD."
+    )
 
 activar_interactividad_avanzada(
     datos.get('categorias_costos', []),
