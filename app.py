@@ -7,7 +7,7 @@ import json
 import os
 import io
 import zipfile
-import random
+import randomle
 import smtplib
 import urllib.parse
 from email.mime.text import MIMEText
@@ -410,36 +410,45 @@ def activar_interactividad_avanzada(cats_costos=None, cats_ingresos=None, ubicac
                 }
             });
 
-            // Align "⇄" reorder button right next to the last main tab
+            // Align "⇄" cycle-tabs button right next to the last main tab
             if (tabLists.length > 0) {
                 const mainTabBtns = tabLists[0].querySelectorAll('button[data-baseweb="tab"]');
                 if (mainTabBtns.length > 0) {
                     const lastTab = mainTabBtns[mainTabBtns.length - 1];
                     const lastRect = lastTab.getBoundingClientRect();
-                    const popovers = doc.querySelectorAll('[data-testid="stPopover"]');
-                    popovers.forEach(pop => {
-                        const btn = pop.querySelector('button');
-                        if (btn && (btn.innerText || '').trim().includes('⇄')) {
+                    doc.querySelectorAll('button').forEach(btn => {
+                        if ((btn.innerText || '').trim() === '⇄') {
+                            const wrap = btn.closest('[data-testid="stButton"]') || btn.parentElement;
+                            const elemCont = btn.closest('[data-testid="element-container"]');
+                            if (elemCont) {
+                                elemCont.style.setProperty('height', '0px', 'important');
+                                elemCont.style.setProperty('min-height', '0px', 'important');
+                                elemCont.style.setProperty('margin', '0px', 'important');
+                                elemCont.style.setProperty('padding', '0px', 'important');
+                                elemCont.style.setProperty('overflow', 'visible', 'important');
+                            }
                             btn.style.setProperty('border-radius', '999px', 'important');
-                            btn.style.setProperty('min-height', '46px', 'important');
-                            btn.style.setProperty('height', '46px', 'important');
-                            btn.style.setProperty('padding', '0 14px', 'important');
+                            btn.style.setProperty('min-height', '44px', 'important');
+                            btn.style.setProperty('height', '44px', 'important');
+                            btn.style.setProperty('width', '44px', 'important');
+                            btn.style.setProperty('padding', '0', 'important');
                             btn.style.setProperty('background', '#F9FAFB', 'important');
                             btn.style.setProperty('border', '1.5px solid #E5E7EB', 'important');
                             btn.style.setProperty('box-shadow', '0 2px 6px rgba(0, 0, 0, 0.04)', 'important');
                             btn.style.setProperty('color', '#4B5563', 'important');
                             const bp = btn.querySelector('p');
                             if (bp) {
-                                bp.style.setProperty('font-size', '1.25rem', 'important');
+                                bp.style.setProperty('font-size', '1.2rem', 'important');
                                 bp.style.setProperty('font-weight', '800', 'important');
                                 bp.style.setProperty('margin', '0', 'important');
                             }
-                            if (lastRect.width > 0 && (lastRect.right + 76) < win.innerWidth) {
-                                pop.style.setProperty('position', 'fixed', 'important');
-                                pop.style.setProperty('top', Math.round(lastRect.top + (lastRect.height - 46) / 2) + 'px', 'important');
-                                pop.style.setProperty('left', Math.round(lastRect.right + 12) + 'px', 'important');
-                                pop.style.setProperty('z-index', '99', 'important');
-                                pop.style.setProperty('width', 'auto', 'important');
+                            if (wrap && lastRect.width > 0 && (lastRect.right + 64) < win.innerWidth) {
+                                wrap.style.setProperty('position', 'fixed', 'important');
+                                wrap.style.setProperty('top', Math.round(lastRect.top + (lastRect.height - 44) / 2) + 'px', 'important');
+                                wrap.style.setProperty('left', Math.round(lastRect.right + 12) + 'px', 'important');
+                                wrap.style.setProperty('z-index', '99', 'important');
+                                wrap.style.setProperty('width', 'auto', 'important');
+                                wrap.style.setProperty('visibility', lastRect.top < 42 ? 'hidden' : 'visible', 'important');
                             }
                         }
                     });
@@ -2856,33 +2865,11 @@ if (
 ):
     orden_tabs_guardado = list(DEFAULT_TAB_ORDER)
 
-with st.popover("⇄", help="Reorder tabs"):
-        st.caption("Drag tabs left or right to change which tab opens first.")
-        if HAS_SORTABLES:
-            nuevo_orden = sort_items(
-                list(orden_tabs_guardado),
-                direction="horizontal",
-                key="finapp_drag_tab_order"
-            )
-            if nuevo_orden and nuevo_orden != orden_tabs_guardado and set(nuevo_orden) == set(DEFAULT_TAB_ORDER):
-                datos["tab_order"] = nuevo_orden
-                guardar_datos(datos, registrar_cambio=False)
-                st.rerun()
-        else:
-            st.caption("Add `streamlit-sortables` to `requirements.txt` for drag-and-drop, or use the arrows below:")
-            for idx_t, t_lbl in enumerate(orden_tabs_guardado):
-                c_tl, c_tu, c_td = st.columns([5, 1.5, 1.5])
-                c_tl.markdown(f"**{t_lbl}**")
-                if c_tu.button("◀", key=f"tab_left_{idx_t}", disabled=(idx_t == 0)):
-                    orden_tabs_guardado[idx_t - 1], orden_tabs_guardado[idx_t] = orden_tabs_guardado[idx_t], orden_tabs_guardado[idx_t - 1]
-                    datos["tab_order"] = orden_tabs_guardado
-                    guardar_datos(datos, registrar_cambio=False)
-                    st.rerun()
-                if c_td.button("▶", key=f"tab_right_{idx_t}", disabled=(idx_t == len(orden_tabs_guardado) - 1)):
-                    orden_tabs_guardado[idx_t + 1], orden_tabs_guardado[idx_t] = orden_tabs_guardado[idx_t], orden_tabs_guardado[idx_t + 1]
-                    datos["tab_order"] = orden_tabs_guardado
-                    guardar_datos(datos, registrar_cambio=False)
-                    st.rerun()
+if st.button("⇄", key="btn_cycle_tabs_order", help="Switch tab order"):
+    nuevo_orden = orden_tabs_guardado[1:] + orden_tabs_guardado[:1]
+    datos["tab_order"] = nuevo_orden
+    guardar_datos(datos, registrar_cambio=False)
+    st.rerun()
 
 tabs_creadas = st.tabs(orden_tabs_guardado)
 mapa_tabs = dict(zip(orden_tabs_guardado, tabs_creadas))
@@ -4279,32 +4266,32 @@ if "finapp_chat_history" not in st.session_state:
     ]
 
 with st.popover("💬 AI Advisor"):
-    c_ch_head, c_ch_clr = st.columns([4, 1.3])
-    c_ch_head.markdown("**💬 Finapp AI Advisor**")
-    if c_ch_clr.button("🗑️ Clear", key="chat_clear_btn", use_container_width=True):
-        st.session_state["finapp_chat_history"] = [
-            {
-                "role": "assistant",
-                "content": "Chat cleared! What would you like to check in your finances?"
-            }
-        ]
-        st.rerun()
-
-    chat_box = st.container(height=340)
+    chat_box = st.container(height=360)
     with chat_box:
         for msg in st.session_state["finapp_chat_history"]:
             with st.chat_message(msg["role"]):
                 st.markdown(msg["content"])
 
-    with st.form("finapp_floating_chat_form", clear_on_submit=True):
-        c_inp, c_send = st.columns([4, 1.2])
-        user_q = c_inp.text_input(
-            "Ask about your finances...",
-            placeholder="e.g. How much did ME Group pay me?",
-            label_visibility="collapsed",
-            key="finapp_chat_text_input",
-        )
-        submitted_q = c_send.form_submit_button("Send", type="primary", use_container_width=True)
+    c_form_col, c_clr_col = st.columns([5.2, 0.9])
+    with c_form_col:
+        with st.form("finapp_floating_chat_form", clear_on_submit=True):
+            c_inp, c_send = st.columns([4, 1.3])
+            user_q = c_inp.text_input(
+                "Ask about your finances...",
+                placeholder="e.g. How much did ME Group pay me?",
+                label_visibility="collapsed",
+                key="finapp_chat_text_input",
+            )
+            submitted_q = c_send.form_submit_button("Send", type="primary", use_container_width=True)
+    with c_clr_col:
+        if st.button("🗑️", key="chat_clear_btn", help="Clear chat", use_container_width=True):
+            st.session_state["finapp_chat_history"] = [
+                {
+                    "role": "assistant",
+                    "content": "Chat cleared! What would you like to check in your finances?"
+                }
+            ]
+            st.rerun()
 
     if submitted_q and user_q.strip():
         # Build live AUD financial snapshot for Gemini
