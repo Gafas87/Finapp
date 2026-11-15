@@ -3184,7 +3184,9 @@ def finalizar_sesion():
 
 with st.sidebar:
     st.markdown(_html_piggy_mascot(96), unsafe_allow_html=True)
-    st.markdown(f"🗓️ **{fecha_texto}**")
+    _d_num = ahora.day
+    _suf = "th" if 11 <= (_d_num % 100) <= 13 else {1: "st", 2: "nd", 3: "rd"}.get(_d_num % 10, "th")
+    st.markdown(f"<div style='text-align:center; font-weight:700; font-size:1.05rem; margin-bottom:6px;'>{ahora.strftime('%B')} {_d_num}{_suf}</div>", unsafe_allow_html=True)
     gcal_url = _obtener_gcal_url()
     if gcal_url:
         eventos_cal, err_cal = obtener_eventos_gcal(gcal_url, days_ahead=30)
@@ -3215,18 +3217,6 @@ with st.sidebar:
                         amt = ev["amount_aud"]
                         amt_txt = (f" (+${amt:,.0f})" if amt > 0 else f" (-${abs(amt):,.0f})") if amt is not None else ""
                         st.caption(f"• **{ev['date_str']}**: {ev['title']}{amt_txt}")
-    if st.button("🔄 Refresh", key="btn_sidebar_actualizar", use_container_width=True):
-        st.cache_data.clear()
-        for k_reset in [
-            "inv_detalle_manual_acc",
-            "inv_detalle_manual_cri",
-            "inv_detalle_manual_bon",
-            "inv_detalle_manual_fci",
-            "inv_detalle_manual_otros",
-            "inv_ubicacion_nueva_manual"
-        ]:
-            st.session_state.pop(k_reset, None)
-        st.rerun()
     st.markdown("---")
 
     REMINDER_OPTIONS = [
@@ -3245,7 +3235,6 @@ with st.sidebar:
         options=REMINDER_OPTIONS,
         index=idx_rec,
         format_func=lambda o: o[1],
-        help="Resets automatically every time you save changes in Finapp.",
         key="side_reminder_freq",
     )
     if sel_rec[0] != dias_rec_actual:
@@ -3254,6 +3243,19 @@ with st.sidebar:
         if sel_rec[0] > 0:
             _notificar_reset_recordatorio_90d(datetime.now(TZ_SYDNEY), days=sel_rec[0], force=True)
         st.toast(f"🔔 Reminder set to: {sel_rec[1]}")
+
+    if st.button("🔄 Refresh", key="btn_sidebar_actualizar", use_container_width=True):
+        st.cache_data.clear()
+        for k_reset in [
+            "inv_detalle_manual_acc",
+            "inv_detalle_manual_cri",
+            "inv_detalle_manual_bon",
+            "inv_detalle_manual_fci",
+            "inv_detalle_manual_otros",
+            "inv_ubicacion_nueva_manual"
+        ]:
+            st.session_state.pop(k_reset, None)
+        st.rerun()
 
     with st.expander("🔐 Recovery Settings"):
         seg_actual = datos.get("seguridad", {})
