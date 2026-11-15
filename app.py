@@ -7,7 +7,7 @@ import json
 import os
 import io
 import zipfile
-import random
+import randomle
 import smtplib
 import urllib.parse
 from email.mime.text import MIMEText
@@ -62,6 +62,154 @@ def _obtener_gemini_key():
     except Exception:
         pass
     return os.environ.get("GEMINI_API_KEY", "").strip()
+
+
+def _obtener_binance_keys():
+    k, s = "", ""
+    try:
+        if hasattr(st, "secrets"):
+            k = str(st.secrets.get("binance_api_key", "")).strip()
+            s = str(st.secrets.get("binance_api_secret", "")).strip()
+    except Exception:
+        pass
+    if not k:
+        k = os.environ.get("BINANCE_API_KEY", "").strip()
+    if not s:
+        s = os.environ.get("BINANCE_API_SECRET", "").strip()
+    return k, s
+
+
+def _binance_signed_get(path, api_key, api_secret, params=None):
+    base_urls = [
+        "https://api.binance.com",
+        "https://api1.binance.com",
+        "https://api2.binance.com",
+        "https://api3.binance.com",
+    ]
+    q = dict(params or {})
+    q["timestamp"] = int(time.time() * 1000)
+    q["recvWindow"] = 10000
+    query_str = urllib.parse.urlencode(q)
+    sig = hmac.new(api_secret.encode("utf-8"), query_str.encode("utf-8"), hashlib.sha256).hexdigest()
+    full_qs = f"{query_str}&signature={sig}"
+    headers = {"X-MBX-APIKEY": api_key}
+
+    last_err = "Could not connect to Binance."
+    for base in base_urls:
+        try:
+            r = requests.get(f"{base}{path}?{full_qs}", headers=headers, timeout=12)
+            if r.status_code == 200:
+                return r.json(), None
+            if r.status_code == 451:
+                last_err = (
+                    "Binance returned HTTP 451 (region block from Streamlit Cloud's US server). "
+                    "Your API key is safe, but Streamlit Cloud's server location is blocked by Binance."
+                )
+                continue
+            try:
+                msg = r.json().get("msg", r.text[:160])
+            except Exception:
+                msg = r.text[:160]
+            return None, f"Binance API error ({r.status_code}): {msg}"
+        except Exception as e:
+            last_err = f"Binance connection error: {e}"
+    return None, last_err
+
+
+@st.cache_data(ttl=120, show_spinner=False)
+def obtener_binance_portfolio(api_key, api_secret, usd_to_aud_rate=1.55, refresh_nonce=0):
+    if not api_key or not api_secret:
+        return [], "Missing Binance API credentials."
+
+    holdings = {}  # (asset, wallet_label) -> qty
+
+    # 1. Spot Wallet (skip LD* wrapped Simple Earn tokens to avoid double counting)
+    spot_data, err = _binance_signed_get("/api/v3/account", api_key, api_secret, {"omitZeroBalances": "true"})
+    if err:
+        return [], err
+    for bal in (spot_data or {}).get("balances", []):
+        asset = str(bal.get("asset", "")).upper().strip()
+        qty = float(bal.get("free", 0) or 0) + float(bal.get("locked", 0) or 0)
+        if not asset or qty <= 0 or (asset.startswith("LD") and len(asset) > 3):
+            continue
+        key = (asset, "Binance Spot")
+        holdings[key] = holdings.get(key, 0.0) + qty
+
+    # 2. Simple Earn Flexible (best-effort)
+    flex_data, _ = _binance_signed_get("/sapi/v1/simple-earn/flexible/position", api_key, api_secret, {"size": 100})
+    for row in (flex_data or {}).get("rows", []):
+        asset = str(row.get("asset", "")).upper().strip()
+        qty = float(row.get("totalAmount", 0) or 0)
+        if asset and qty > 0:
+            key = (asset, "Binance Earn (Flex)")
+            holdings[key] = holdings.get(key, 0.0) + qty
+
+    # 3. Simple Earn Locked (best-effort)
+    lock_data, _ = _binance_signed_get("/sapi/v1/simple-earn/locked/position", api_key, api_secret, {"size": 100})
+    for row in (lock_data or {}).get("rows", []):
+        asset = str(row.get("asset", "")).upper().strip()
+        qty = float(row.get("amount", 0) or 0)
+        if asset and qty > 0:
+            key = (asset, "Binance Earn (Locked)")
+            holdings[key] = holdings.get(key, 0.0) + qty
+
+    if not holdings:
+        return [], None
+
+    # 4. Live USD prices from Binance public ticker (with data-api fallback)
+    price_map = {}
+    for ticker_url in [
+        "https://data-api.binance.vision/api/v3/ticker/price",
+        "https://api.binance.com/api/v3/ticker/price",
+    ]:
+        try:
+            pr = requests.get(ticker_url, timeout=10)
+            if pr.status_code == 200:
+                for item in pr.json():
+                    price_map[item["symbol"]] = float(item["price"])
+                break
+        except Exception:
+            continue
+
+    stables = {"USDT", "USDC", "FDUSD", "BUSD", "TUSD", "DAI", "USDP", "USD"}
+    btc_usd = price_map.get("BTCUSDT", 0.0)
+
+    resultados = []
+    for (asset, wallet_lbl), qty in holdings.items():
+        if asset == "AUD":
+            precio_aud = 1.0
+            quote_str = "1 AUD = $1.00 AUD"
+        elif asset in stables:
+            precio_aud = float(usd_to_aud_rate)
+            quote_str = f"1 {asset} = ${precio_aud:,.2f} AUD"
+        elif f"{asset}USDT" in price_map:
+            p_usd = price_map[f"{asset}USDT"]
+            precio_aud = p_usd * float(usd_to_aud_rate)
+            quote_str = f"1 {asset} = ${precio_aud:,.2f} AUD"
+        elif f"{asset}USDC" in price_map:
+            p_usd = price_map[f"{asset}USDC"]
+            precio_aud = p_usd * float(usd_to_aud_rate)
+            quote_str = f"1 {asset} = ${precio_aud:,.2f} AUD"
+        elif f"{asset}BTC" in price_map and btc_usd > 0:
+            p_usd = price_map[f"{asset}BTC"] * btc_usd
+            precio_aud = p_usd * float(usd_to_aud_rate)
+            quote_str = f"1 {asset} = ${precio_aud:,.2f} AUD"
+        else:
+            precio_aud = 0.0
+            quote_str = f"⚠️ No quote for {asset}"
+
+        val_aud = qty * precio_aud
+        resultados.append({
+            "asset": asset,
+            "wallet": wallet_lbl,
+            "qty": qty,
+            "price_aud": precio_aud,
+            "val_aud": val_aud,
+            "quote_str": quote_str,
+        })
+
+    resultados.sort(key=lambda x: x["val_aud"], reverse=True)
+    return resultados, None
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -3443,6 +3591,41 @@ with pestana2:
             "Active_Flag": esta_activo
         })
 
+    bn_key, bn_sec = _obtener_binance_keys()
+    if bn_key and bn_sec:
+        c_bn1, c_bn2 = st.columns([2.5, 2.5])
+        usar_binance_live = c_bn1.checkbox(
+            "🟡 Sync Live Binance (Spot + Simple Earn)",
+            value=True,
+            key="tab2_sync_binance_live",
+        )
+        ocultar_polvo_bn = c_bn2.checkbox(
+            "Hide dust (< $0.50 AUD)",
+            value=True,
+            key="tab2_hide_binance_dust",
+        )
+        if usar_binance_live:
+            bn_rows, bn_err = obtener_binance_portfolio(bn_key, bn_sec, usd_to_aud)
+            if bn_err:
+                st.warning(f"⚠️ {bn_err}")
+            else:
+                for b in bn_rows:
+                    if ocultar_polvo_bn and b["val_aud"] < 0.50:
+                        continue
+                    filas.append({
+                        "Type": "Cryptos",
+                        "Asset": f"{b['asset']} (Binance)",
+                        "Symbol": b["asset"],
+                        "Platform": b["wallet"],
+                        "Quantity_Num": b["qty"],
+                        "Quantity": formatear_cant(b["qty"]),
+                        "Price_Unit_AUD": b["price_aud"],
+                        "Price_Valid": b["price_aud"] > 0,
+                        "Live Quote": b["quote_str"],
+                        "Value (AUD)": b["val_aud"],
+                        "Active_Flag": True,
+                    })
+
     if advertencias_precios:
         st.warning(
             "⚠️ No valid quote found for: "
@@ -4315,6 +4498,17 @@ with st.popover("💬 AI Advisor"):
                     for x in inv_items[:30]
                 )
             )
+
+        bn_k_c, bn_s_c = _obtener_binance_keys()
+        if bn_k_c and bn_s_c:
+            bn_rows_c, bn_err_c = obtener_binance_portfolio(bn_k_c, bn_s_c, usd_to_aud)
+            if bn_rows_c and not bn_err_c:
+                bn_vis = [x for x in bn_rows_c if x["val_aud"] >= 0.50]
+                tot_bn = sum(x["val_aud"] for x in bn_vis)
+                resumen_ctx.append(
+                    f"Live Binance Portfolio Total: ${tot_bn:,.2f} AUD | "
+                    + "; ".join(f"{x['asset']} ({x['wallet']}): {x['qty']} = ${x['val_aud']:,.2f} AUD" for x in bn_vis[:25])
+                )
 
         up_tok = _obtener_up_token() or st.session_state.get("up_temp_token", "")
         if up_tok:
