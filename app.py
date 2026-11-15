@@ -29,7 +29,7 @@ from xml.sax.saxutils import escape as xml_escape
 st.set_page_config(
     page_title="Finapp",
     layout="wide",
-    page_icon="💳",
+    page_icon="🐷",
     initial_sidebar_state="expanded"
 )
 
@@ -62,6 +62,235 @@ def _obtener_gemini_key():
     except Exception:
         pass
     return os.environ.get("GEMINI_API_KEY", "").strip()
+
+
+def _obtener_gcal_url():
+    try:
+        if hasattr(st, "secrets") and "gcal_ics_url" in st.secrets:
+            return str(st.secrets["gcal_ics_url"]).strip()
+    except Exception:
+        pass
+    return os.environ.get("GCAL_ICS_URL", "").strip()
+
+
+def _parse_ics_dt(val_str):
+    v = (val_str or "").strip()
+    if not v:
+        return None, True
+    if len(v) == 8 and v.isdigit():
+        return datetime.strptime(v, "%Y%m%d").replace(tzinfo=TZ_SYDNEY), True
+    if v.endswith("Z"):
+        dt_utc = datetime.strptime(v[:15], "%Y%m%dT%H%M%S").replace(tzinfo=ZoneInfo("UTC"))
+        return dt_utc.astimezone(TZ_SYDNEY), False
+    if "T" in v:
+        return datetime.strptime(v[:15], "%Y%m%dT%H%M%S").replace(tzinfo=TZ_SYDNEY), False
+    return None, True
+
+
+def _extraer_monto_evento(texto):
+    import re
+    t = texto or ""
+    m = re.search(r'([+-])?\s*(?:AUD\s*)?\$\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)', t, re.IGNORECASE)
+    if not m:
+        return None
+    signo = m.group(1) or ""
+    num = float(m.group(2).replace(",", ""))
+    if signo == "-":
+        return -num
+    if signo == "+":
+        return num
+    low = t.lower()
+    if any(k in low for k in ["payday", "salary", "wage", "income", "deposit", "refund", "rent from", "contribution"]):
+        return num
+    return -num
+
+
+@st.cache_data(ttl=180, show_spinner=False)
+def obtener_eventos_gcal(ics_url, days_ahead=30, refresh_nonce=0):
+    if not ics_url:
+        return [], None
+    try:
+        r = requests.get(ics_url, timeout=12)
+        if r.status_code != 200:
+            return [], f"Calendar sync error ({r.status_code})."
+        raw_lines = r.text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+        unfolded = []
+        for ln in raw_lines:
+            if ln.startswith((" ", "\t")) and unfolded:
+                unfolded[-1] += ln[1:]
+            else:
+                unfolded.append(ln)
+
+        ahora = datetime.now(TZ_SYDNEY)
+        hoy = ahora.date()
+        fin = hoy + timedelta(days=int(days_ahead))
+
+        eventos = []
+        cur = None
+        for ln in unfolded:
+            if ln == "BEGIN:VEVENT":
+                cur = {}
+            elif ln == "END:VEVENT":
+                if cur and cur.get("DTSTART"):
+                    dt0, is_all_day = _parse_ics_dt(cur["DTSTART"])
+                    if dt0 is not None:
+                        summary = cur.get("SUMMARY", "Scheduled Event").replace("\\,", ",").replace("\\n", " ").strip()
+                        desc = cur.get("DESCRIPTION", "").replace("\\,", ",").replace("\\n", " ").strip()
+                        rrule = cur.get("RRULE", "")
+                        fechas_occ = []
+                        if not rrule:
+                            if hoy <= dt0.date() <= fin:
+                                fechas_occ.append(dt0)
+                        else:
+                            parts = dict(p.split("=", 1) for p in rrule.split(";") if "=" in p)
+                            freq = parts.get("FREQ", "")
+                            interval = int(parts.get("INTERVAL", "1") or "1")
+                            until_dt = None
+                            if "UNTIL" in parts:
+                                until_dt, _ = _parse_ics_dt(parts["UNTIL"])
+                            cur_dt = dt0
+                            guard = 0
+                            while cur_dt.date() <= fin and guard < 400:
+                                guard += 1
+                                if until_dt and cur_dt > until_dt:
+                                    break
+                                if cur_dt.date() >= hoy:
+                                    fechas_occ.append(cur_dt)
+                                if freq == "WEEKLY":
+                                    cur_dt = cur_dt + timedelta(days=7 * interval)
+                                elif freq == "DAILY":
+                                    cur_dt = cur_dt + timedelta(days=interval)
+                                elif freq == "MONTHLY":
+                                    m_new = cur_dt.month - 1 + interval
+                                    y_new = cur_dt.year + m_new // 12
+                                    m_new = m_new % 12 + 1
+                                    import calendar as _cal
+                                    d_new = min(cur_dt.day, _cal.monthrange(y_new, m_new)[1])
+                                    cur_dt = cur_dt.replace(year=y_new, month=m_new, day=d_new)
+                                elif freq == "YEARLY":
+                                    try:
+                                        cur_dt = cur_dt.replace(year=cur_dt.year + interval)
+                                    except ValueError:
+                                        cur_dt = cur_dt.replace(year=cur_dt.year + interval, day=28)
+                                else:
+                                    break
+
+                        monto_est = _extraer_monto_evento(f"{summary} {desc}")
+                        for occ in fechas_occ:
+                            dias_f = (occ.date() - hoy).days
+                            if dias_f == 0:
+                                cuando = "Today"
+                            elif dias_f == 1:
+                                cuando = "Tomorrow"
+                            else:
+                                cuando = f"In {dias_f} days"
+                            eventos.append({
+                                "date": occ.date(),
+                                "date_str": occ.strftime("%a %d %b"),
+                                "when": cuando,
+                                "days_left": dias_f,
+                                "title": summary,
+                                "amount_aud": monto_est,
+                            })
+                cur = None
+            elif cur is not None and ":" in ln:
+                k_raw, val = ln.split(":", 1)
+                k = k_raw.split(";")[0].upper()
+                cur[k] = val
+
+        eventos.sort(key=lambda x: (x["date"], x["title"]))
+        return eventos, None
+    except Exception as e:
+        return [], f"Calendar read error: {e}"
+
+
+def _html_piggy_mascot(width=126):
+    return f"""
+    <div style="display:flex; justify-content:center; align-items:center; margin: 2px auto 4px auto;">
+      <style>
+        @keyframes pigBreathe {{
+          0%, 100% {{ transform: translateY(0px) scale(1, 1); }}
+          50% {{ transform: translateY(-2.5px) scale(1.015, 0.99); }}
+        }}
+        @keyframes pigHeadTilt {{
+          0%, 100% {{ transform: rotate(0deg); }}
+          25% {{ transform: rotate(-2.2deg); }}
+          75% {{ transform: rotate(2.2deg); }}
+        }}
+        @keyframes pigBlink {{
+          0%, 44%, 48%, 100% {{ transform: scaleY(1); }}
+          46% {{ transform: scaleY(0.12); }}
+        }}
+        @keyframes pigSnout {{
+          0%, 100% {{ transform: translateY(0px) scale(1); }}
+          50% {{ transform: translateY(-1px) scale(1.03); }}
+        }}
+        @keyframes pigWave {{
+          0%, 72%, 100% {{ transform: rotate(0deg); }}
+          78% {{ transform: rotate(-16deg); }}
+          84% {{ transform: rotate(8deg); }}
+          90% {{ transform: rotate(-12deg); }}
+        }}
+        .pig-body-anim {{ transform-origin: 100px 115px; animation: pigBreathe 3.4s ease-in-out infinite; }}
+        .pig-head-anim {{ transform-origin: 100px 92px; animation: pigHeadTilt 5.5s ease-in-out infinite; }}
+        .pig-eye-anim {{ transform-origin: center; transform-box: fill-box; animation: pigBlink 4.6s ease-in-out infinite; }}
+        .pig-snout-anim {{ transform-origin: 100px 106px; animation: pigSnout 2.8s ease-in-out infinite; }}
+        .pig-wave-anim {{ transform-origin: 145px 114px; animation: pigWave 6s ease-in-out infinite; }}
+      </style>
+      <svg width="{width}" viewBox="0 0 200 165" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="pigBodyGrad" cx="42%" cy="35%" r="65%">
+            <stop offset="0%" stop-color="#FBCFE8"/>
+            <stop offset="55%" stop-color="#F472B6"/>
+            <stop offset="100%" stop-color="#DB2777"/>
+          </radialGradient>
+          <linearGradient id="metaLens" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#38BDF8" stop-opacity="0.32"/>
+            <stop offset="50%" stop-color="#0F172A" stop-opacity="0.18"/>
+            <stop offset="100%" stop-color="#818CF8" stop-opacity="0.35"/>
+          </linearGradient>
+        </defs>
+        <ellipse cx="100" cy="150" rx="54" ry="8" fill="#CBD5E1" opacity="0.55"/>
+        <g class="pig-body-anim">
+          <path d="M 42 104 Q 26 96 31 84 Q 36 74 44 82 Q 49 88 41 94" fill="none" stroke="#EC4899" stroke-width="5" stroke-linecap="round"/>
+          <rect x="64" y="128" width="16" height="20" rx="7" fill="#DB2777"/>
+          <rect x="118" y="128" width="16" height="20" rx="7" fill="#DB2777"/>
+          <g class="pig-wave-anim">
+            <rect x="142" y="106" width="22" height="13" rx="6.5" fill="#F472B6" stroke="#DB2777" stroke-width="1.5"/>
+          </g>
+          <ellipse cx="100" cy="100" rx="60" ry="46" fill="url(#pigBodyGrad)"/>
+          <rect x="82" y="54" width="36" height="7" rx="3.5" fill="#831843"/>
+          <rect x="85" y="55.5" width="30" height="2" rx="1" fill="#FDE047" opacity="0.75"/>
+          <g class="pig-head-anim">
+            <path d="M 54 68 Q 42 40 68 52 Z" fill="#F472B6" stroke="#DB2777" stroke-width="1.5"/>
+            <path d="M 56 64 Q 49 48 65 55 Z" fill="#FBCFE8"/>
+            <path d="M 146 68 Q 158 40 132 52 Z" fill="#F472B6" stroke="#DB2777" stroke-width="1.5"/>
+            <path d="M 144 64 Q 151 48 135 55 Z" fill="#FBCFE8"/>
+            <g class="pig-eye-anim">
+              <circle cx="78" cy="84" r="5.5" fill="#1E293B"/>
+              <circle cx="76.5" cy="82.2" r="2" fill="#FFFFFF"/>
+              <circle cx="122" cy="84" r="5.5" fill="#1E293B"/>
+              <circle cx="120.5" cy="82.2" r="2" fill="#FFFFFF"/>
+            </g>
+            <rect x="57" y="73" width="39" height="22" rx="7" fill="url(#metaLens)" stroke="#0F172A" stroke-width="3.6"/>
+            <rect x="104" y="73" width="39" height="22" rx="7" fill="url(#metaLens)" stroke="#0F172A" stroke-width="3.6"/>
+            <path d="M 96 81 Q 100 78 104 81" fill="none" stroke="#0F172A" stroke-width="3.6" stroke-linecap="round"/>
+            <line x1="48" y1="80" x2="57" y2="80" stroke="#0F172A" stroke-width="3.5" stroke-linecap="round"/>
+            <line x1="143" y1="80" x2="152" y2="80" stroke="#0F172A" stroke-width="3.5" stroke-linecap="round"/>
+            <circle cx="140" cy="77" r="2.2" fill="#38BDF8"/>
+            <line x1="63" y1="77" x2="72" y2="77" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round" opacity="0.65"/>
+            <line x1="110" y1="77" x2="119" y2="77" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round" opacity="0.65"/>
+            <g class="pig-snout-anim">
+              <ellipse cx="100" cy="108" rx="22" ry="15" fill="#FBCFE8" stroke="#EC4899" stroke-width="2"/>
+              <ellipse cx="92" cy="108" rx="3.6" ry="5.2" fill="#9D174D"/>
+              <ellipse cx="108" cy="108" rx="3.6" ry="5.2" fill="#9D174D"/>
+            </g>
+            <path d="M 88 127 Q 100 135 112 127" fill="none" stroke="#9D174D" stroke-width="2.6" stroke-linecap="round"/>
+          </g>
+        </g>
+      </svg>
+    </div>
+    """
 
 
 def _obtener_binance_keys():
@@ -2711,9 +2940,9 @@ if "envio_exitoso_rec" not in st.session_state:
 if not st.session_state.autenticado:
     c1, c2, c3 = st.columns([0.85, 1.5, 0.85])
     with c2:
-        st.markdown("""
+        st.markdown(f"""
         <div class="jardin-login-box">
-            <div style="font-size: 2.3rem; line-height: 1;">💳</div>
+            {_html_piggy_mascot(132)}
             <div class="jardin-login-title">Finapp</div>
             <div class="jardin-login-sub">Your personal space for financial clarity</div>
         </div>
@@ -2925,7 +3154,38 @@ def finalizar_sesion():
 
 
 with st.sidebar:
+    st.markdown(_html_piggy_mascot(96), unsafe_allow_html=True)
     st.markdown(f"🗓️ **{fecha_texto}**")
+    gcal_url = _obtener_gcal_url()
+    if gcal_url:
+        eventos_cal, err_cal = obtener_eventos_gcal(gcal_url, days_ahead=30)
+        st.markdown("**📅 Coming Payments**")
+        if err_cal:
+            st.caption(f"⚠️ {err_cal}")
+        elif not eventos_cal:
+            st.caption("No upcoming events in the next 30 days.")
+        else:
+            for ev in eventos_cal[:5]:
+                amt = ev["amount_aud"]
+                if amt is not None:
+                    amt_str = f"+${amt:,.0f}" if amt > 0 else f"-${abs(amt):,.0f}"
+                    color_ev = "#0F766E" if amt > 0 else "#B45309"
+                    badge = f"<span style='color:{color_ev}; font-weight:700;'>{amt_str}</span>"
+                else:
+                    badge = ""
+                st.markdown(
+                    f"<div style='background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; "
+                    f"padding:6px 9px; margin-bottom:5px; font-size:0.83rem; line-height:1.3;'>"
+                    f"<b>{ev['title']}</b> {badge}<br>"
+                    f"<span style='color:#64748B;'>{ev['date_str']} · {ev['when']}</span></div>",
+                    unsafe_allow_html=True,
+                )
+            if len(eventos_cal) > 5:
+                with st.expander(f"+ {len(eventos_cal) - 5} more upcoming"):
+                    for ev in eventos_cal[5:15]:
+                        amt = ev["amount_aud"]
+                        amt_txt = (f" (+${amt:,.0f})" if amt > 0 else f" (-${abs(amt):,.0f})") if amt is not None else ""
+                        st.caption(f"• **{ev['date_str']}**: {ev['title']}{amt_txt}")
     if st.button("🔄 Refresh", key="btn_sidebar_actualizar", use_container_width=True):
         st.cache_data.clear()
         for k_reset in [
@@ -4588,6 +4848,19 @@ with st.popover("💬 AI Advisor"):
                 resumen_ctx.append(
                     f"Live Binance Portfolio Total: ${tot_bn:,.2f} AUD | "
                     + "; ".join(f"{x['asset']} ({x['wallet']}): {x['qty']} = ${x['val_aud']:,.2f} AUD" for x in bn_vis[:25])
+                )
+
+        gcal_c = _obtener_gcal_url()
+        if gcal_c:
+            ev_c, err_gc = obtener_eventos_gcal(gcal_c, days_ahead=30)
+            if ev_c and not err_gc:
+                resumen_ctx.append(
+                    "Upcoming Google Calendar Payments (next 30d): "
+                    + "; ".join(
+                        f"{e['date_str']} ({e['when']}): {e['title']}"
+                        + (f" [${e['amount_aud']:,.2f} AUD]" if e['amount_aud'] is not None else "")
+                        for e in ev_c[:15]
+                    )
                 )
 
         up_tok = _obtener_up_token() or st.session_state.get("up_temp_token", "")
