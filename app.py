@@ -206,90 +206,90 @@ def obtener_eventos_gcal(ics_url, days_ahead=30, refresh_nonce=0):
 
 def _html_piggy_mascot(width=126):
     return f"""
-    <div style="display:flex; justify-content:center; align-items:center; margin: 2px auto 4px auto;">
-      <style>
-        @keyframes pigBreathe {{
-          0%, 100% {{ transform: translateY(0px) scale(1, 1); }}
-          50% {{ transform: translateY(-2.5px) scale(1.015, 0.99); }}
-        }}
-        @keyframes pigHeadTilt {{
-          0%, 100% {{ transform: rotate(0deg); }}
-          25% {{ transform: rotate(-2.2deg); }}
-          75% {{ transform: rotate(2.2deg); }}
-        }}
-        @keyframes pigBlink {{
-          0%, 44%, 48%, 100% {{ transform: scaleY(1); }}
-          46% {{ transform: scaleY(0.12); }}
-        }}
-        @keyframes pigSnout {{
-          0%, 100% {{ transform: translateY(0px) scale(1); }}
-          50% {{ transform: translateY(-1px) scale(1.03); }}
-        }}
-        @keyframes pigWave {{
-          0%, 72%, 100% {{ transform: rotate(0deg); }}
-          78% {{ transform: rotate(-16deg); }}
-          84% {{ transform: rotate(8deg); }}
-          90% {{ transform: rotate(-12deg); }}
-        }}
-        .pig-body-anim {{ transform-origin: 100px 115px; animation: pigBreathe 3.4s ease-in-out infinite; }}
-        .pig-head-anim {{ transform-origin: 100px 92px; animation: pigHeadTilt 5.5s ease-in-out infinite; }}
-        .pig-eye-anim {{ transform-origin: center; transform-box: fill-box; animation: pigBlink 4.6s ease-in-out infinite; }}
-        .pig-snout-anim {{ transform-origin: 100px 106px; animation: pigSnout 2.8s ease-in-out infinite; }}
-        .pig-wave-anim {{ transform-origin: 145px 114px; animation: pigWave 6s ease-in-out infinite; }}
-      </style>
-      <svg width="{width}" viewBox="0 0 200 165" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <radialGradient id="pigBodyGrad" cx="42%" cy="35%" r="65%">
-            <stop offset="0%" stop-color="#FBCFE8"/>
-            <stop offset="55%" stop-color="#F472B6"/>
-            <stop offset="100%" stop-color="#DB2777"/>
-          </radialGradient>
-          <linearGradient id="metaLens" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="#38BDF8" stop-opacity="0.32"/>
-            <stop offset="50%" stop-color="#0F172A" stop-opacity="0.18"/>
-            <stop offset="100%" stop-color="#818CF8" stop-opacity="0.35"/>
-          </linearGradient>
-        </defs>
-        <ellipse cx="100" cy="150" rx="54" ry="8" fill="#CBD5E1" opacity="0.55"/>
-        <g class="pig-body-anim">
-          <path d="M 42 104 Q 26 96 31 84 Q 36 74 44 82 Q 49 88 41 94" fill="none" stroke="#EC4899" stroke-width="5" stroke-linecap="round"/>
-          <rect x="64" y="128" width="16" height="20" rx="7" fill="#DB2777"/>
-          <rect x="118" y="128" width="16" height="20" rx="7" fill="#DB2777"/>
-          <g class="pig-wave-anim">
-            <rect x="142" y="106" width="22" height="13" rx="6.5" fill="#F472B6" stroke="#DB2777" stroke-width="1.5"/>
-          </g>
-          <ellipse cx="100" cy="100" rx="60" ry="46" fill="url(#pigBodyGrad)"/>
-          <rect x="82" y="54" width="36" height="7" rx="3.5" fill="#831843"/>
-          <rect x="85" y="55.5" width="30" height="2" rx="1" fill="#FDE047" opacity="0.75"/>
-          <g class="pig-head-anim">
-            <path d="M 54 68 Q 42 40 68 52 Z" fill="#F472B6" stroke="#DB2777" stroke-width="1.5"/>
-            <path d="M 56 64 Q 49 48 65 55 Z" fill="#FBCFE8"/>
-            <path d="M 146 68 Q 158 40 132 52 Z" fill="#F472B6" stroke="#DB2777" stroke-width="1.5"/>
-            <path d="M 144 64 Q 151 48 135 55 Z" fill="#FBCFE8"/>
-            <g class="pig-eye-anim">
-              <circle cx="78" cy="84" r="5.5" fill="#1E293B"/>
-              <circle cx="76.5" cy="82.2" r="2" fill="#FFFFFF"/>
-              <circle cx="122" cy="84" r="5.5" fill="#1E293B"/>
-              <circle cx="120.5" cy="82.2" r="2" fill="#FFFFFF"/>
-            </g>
-            <rect x="57" y="73" width="39" height="22" rx="7" fill="url(#metaLens)" stroke="#0F172A" stroke-width="3.6"/>
-            <rect x="104" y="73" width="39" height="22" rx="7" fill="url(#metaLens)" stroke="#0F172A" stroke-width="3.6"/>
-            <path d="M 96 81 Q 100 78 104 81" fill="none" stroke="#0F172A" stroke-width="3.6" stroke-linecap="round"/>
-            <line x1="48" y1="80" x2="57" y2="80" stroke="#0F172A" stroke-width="3.5" stroke-linecap="round"/>
-            <line x1="143" y1="80" x2="152" y2="80" stroke="#0F172A" stroke-width="3.5" stroke-linecap="round"/>
-            <circle cx="140" cy="77" r="2.2" fill="#38BDF8"/>
-            <line x1="63" y1="77" x2="72" y2="77" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round" opacity="0.65"/>
-            <line x1="110" y1="77" x2="119" y2="77" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round" opacity="0.65"/>
-            <g class="pig-snout-anim">
-              <ellipse cx="100" cy="108" rx="22" ry="15" fill="#FBCFE8" stroke="#EC4899" stroke-width="2"/>
-              <ellipse cx="92" cy="108" rx="3.6" ry="5.2" fill="#9D174D"/>
-              <ellipse cx="108" cy="108" rx="3.6" ry="5.2" fill="#9D174D"/>
-            </g>
-            <path d="M 88 127 Q 100 135 112 127" fill="none" stroke="#9D174D" stroke-width="2.6" stroke-linecap="round"/>
-          </g>
-        </g>
-      </svg>
-    </div>
+<div style="display:flex; justify-content:center; align-items:center; margin: 2px auto 4px auto;">
+<style>
+@keyframes pigBreathe {{
+0%, 100% {{ transform: translateY(0px) scale(1, 1); }}
+50% {{ transform: translateY(-2.5px) scale(1.015, 0.99); }}
+}}
+@keyframes pigHeadTilt {{
+0%, 100% {{ transform: rotate(0deg); }}
+25% {{ transform: rotate(-2.2deg); }}
+75% {{ transform: rotate(2.2deg); }}
+}}
+@keyframes pigBlink {{
+0%, 44%, 48%, 100% {{ transform: scaleY(1); }}
+46% {{ transform: scaleY(0.12); }}
+}}
+@keyframes pigSnout {{
+0%, 100% {{ transform: translateY(0px) scale(1); }}
+50% {{ transform: translateY(-1px) scale(1.03); }}
+}}
+@keyframes pigWave {{
+0%, 72%, 100% {{ transform: rotate(0deg); }}
+78% {{ transform: rotate(-16deg); }}
+84% {{ transform: rotate(8deg); }}
+90% {{ transform: rotate(-12deg); }}
+}}
+.pig-body-anim {{ transform-origin: 100px 115px; animation: pigBreathe 3.4s ease-in-out infinite; }}
+.pig-head-anim {{ transform-origin: 100px 92px; animation: pigHeadTilt 5.5s ease-in-out infinite; }}
+.pig-eye-anim {{ transform-origin: center; transform-box: fill-box; animation: pigBlink 4.6s ease-in-out infinite; }}
+.pig-snout-anim {{ transform-origin: 100px 106px; animation: pigSnout 2.8s ease-in-out infinite; }}
+.pig-wave-anim {{ transform-origin: 145px 114px; animation: pigWave 6s ease-in-out infinite; }}
+</style>
+<svg width="{width}" viewBox="0 0 200 165" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<radialGradient id="pigBodyGrad" cx="42%" cy="35%" r="65%">
+<stop offset="0%" stop-color="#FBCFE8"/>
+<stop offset="55%" stop-color="#F472B6"/>
+<stop offset="100%" stop-color="#DB2777"/>
+</radialGradient>
+<linearGradient id="metaLens" x1="0%" y1="0%" x2="100%" y2="100%">
+<stop offset="0%" stop-color="#38BDF8" stop-opacity="0.32"/>
+<stop offset="50%" stop-color="#0F172A" stop-opacity="0.18"/>
+<stop offset="100%" stop-color="#818CF8" stop-opacity="0.35"/>
+</linearGradient>
+</defs>
+<ellipse cx="100" cy="150" rx="54" ry="8" fill="#CBD5E1" opacity="0.55"/>
+<g class="pig-body-anim">
+<path d="M 42 104 Q 26 96 31 84 Q 36 74 44 82 Q 49 88 41 94" fill="none" stroke="#EC4899" stroke-width="5" stroke-linecap="round"/>
+<rect x="64" y="128" width="16" height="20" rx="7" fill="#DB2777"/>
+<rect x="118" y="128" width="16" height="20" rx="7" fill="#DB2777"/>
+<g class="pig-wave-anim">
+<rect x="142" y="106" width="22" height="13" rx="6.5" fill="#F472B6" stroke="#DB2777" stroke-width="1.5"/>
+</g>
+<ellipse cx="100" cy="100" rx="60" ry="46" fill="url(#pigBodyGrad)"/>
+<rect x="82" y="54" width="36" height="7" rx="3.5" fill="#831843"/>
+<rect x="85" y="55.5" width="30" height="2" rx="1" fill="#FDE047" opacity="0.75"/>
+<g class="pig-head-anim">
+<path d="M 54 68 Q 42 40 68 52 Z" fill="#F472B6" stroke="#DB2777" stroke-width="1.5"/>
+<path d="M 56 64 Q 49 48 65 55 Z" fill="#FBCFE8"/>
+<path d="M 146 68 Q 158 40 132 52 Z" fill="#F472B6" stroke="#DB2777" stroke-width="1.5"/>
+<path d="M 144 64 Q 151 48 135 55 Z" fill="#FBCFE8"/>
+<g class="pig-eye-anim">
+<circle cx="78" cy="84" r="5.5" fill="#1E293B"/>
+<circle cx="76.5" cy="82.2" r="2" fill="#FFFFFF"/>
+<circle cx="122" cy="84" r="5.5" fill="#1E293B"/>
+<circle cx="120.5" cy="82.2" r="2" fill="#FFFFFF"/>
+</g>
+<rect x="57" y="73" width="39" height="22" rx="7" fill="url(#metaLens)" stroke="#0F172A" stroke-width="3.6"/>
+<rect x="104" y="73" width="39" height="22" rx="7" fill="url(#metaLens)" stroke="#0F172A" stroke-width="3.6"/>
+<path d="M 96 81 Q 100 78 104 81" fill="none" stroke="#0F172A" stroke-width="3.6" stroke-linecap="round"/>
+<line x1="48" y1="80" x2="57" y2="80" stroke="#0F172A" stroke-width="3.5" stroke-linecap="round"/>
+<line x1="143" y1="80" x2="152" y2="80" stroke="#0F172A" stroke-width="3.5" stroke-linecap="round"/>
+<circle cx="140" cy="77" r="2.2" fill="#38BDF8"/>
+<line x1="63" y1="77" x2="72" y2="77" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round" opacity="0.65"/>
+<line x1="110" y1="77" x2="119" y2="77" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round" opacity="0.65"/>
+<g class="pig-snout-anim">
+<ellipse cx="100" cy="108" rx="22" ry="15" fill="#FBCFE8" stroke="#EC4899" stroke-width="2"/>
+<ellipse cx="92" cy="108" rx="3.6" ry="5.2" fill="#9D174D"/>
+<ellipse cx="108" cy="108" rx="3.6" ry="5.2" fill="#9D174D"/>
+</g>
+<path d="M 88 127 Q 100 135 112 127" fill="none" stroke="#9D174D" stroke-width="2.6" stroke-linecap="round"/>
+</g>
+</g>
+</svg>
+</div>
     """
 
 
@@ -2940,13 +2940,12 @@ if "envio_exitoso_rec" not in st.session_state:
 if not st.session_state.autenticado:
     c1, c2, c3 = st.columns([0.85, 1.5, 0.85])
     with c2:
-        st.markdown(f"""
-        <div class="jardin-login-box">
-            {_html_piggy_mascot(132)}
-            <div class="jardin-login-title">Finapp</div>
-            <div class="jardin-login-sub">Your personal space for financial clarity</div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="jardin-login-box">{_html_piggy_mascot(132)}'
+            f'<div class="jardin-login-title">Finapp</div>'
+            f'<div class="jardin-login-sub">Your personal space for financial clarity</div></div>',
+            unsafe_allow_html=True,
+        )
 
         with st.form("login_form"):
             user = st.text_input("Username", value="Julian")
