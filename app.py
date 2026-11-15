@@ -73,6 +73,34 @@ def _obtener_gcal_url():
     return os.environ.get("GCAL_ICS_URL", "").strip()
 
 
+def _obtener_gcal_webhook_url():
+    try:
+        if hasattr(st, "secrets") and "gcal_reminder_webhook" in st.secrets:
+            return str(st.secrets["gcal_reminder_webhook"]).strip()
+    except Exception:
+        pass
+    return os.environ.get("GCAL_REMINDER_WEBHOOK", "").strip()
+
+
+def _notificar_reset_recordatorio_90d(ahora_syd, days=90, force=False):
+    url = _obtener_gcal_webhook_url()
+    if not url or int(days) <= 0:
+        return
+    try:
+        now_epoch = time.time()
+        last_ping = float(st.session_state.get("_last_gcal_reminder_ping", 0.0) or 0.0)
+        if not force and (now_epoch - last_ping < 60):
+            return
+        st.session_state["_last_gcal_reminder_ping"] = now_epoch
+        requests.post(
+            url,
+            json={"saved_at": ahora_syd.isoformat(), "days": int(days)},
+            timeout=4,
+        )
+    except Exception:
+        pass
+
+
 def _parse_ics_dt(val_str):
     v = (val_str or "").strip()
     if not v:
@@ -1972,6 +2000,8 @@ def guardar_datos(datos, registrar_cambio=True):
         with open(DATA_FILE, "w", encoding="utf-8") as f:
             json.dump(datos, f, ensure_ascii=False, indent=4)
         st.session_state["finapp_unsaved_changes"] = False
+        if registrar_cambio:
+            _notificar_reset_recordatorio_90d(ahora_syd, days=int(datos.get("reminder_days", 90)))
         return True
     except Exception:
         if registrar_cambio:
@@ -3199,6 +3229,32 @@ with st.sidebar:
         st.rerun()
     st.markdown("---")
 
+    REMINDER_OPTIONS = [
+        (1, "1 day"),
+        (7, "1 week"),
+        (30, "1 month"),
+        (60, "2 months"),
+        (90, "1 quarter (90 days)"),
+        (180, "6 months"),
+        (0, "Off"),
+    ]
+    dias_rec_actual = int(datos.get("reminder_days", 90))
+    idx_rec = next((i for i, opt in enumerate(REMINDER_OPTIONS) if opt[0] == dias_rec_actual), 4)
+    sel_rec = st.selectbox(
+        "🔔 Cost Review Reminder",
+        options=REMINDER_OPTIONS,
+        index=idx_rec,
+        format_func=lambda o: o[1],
+        help="Resets automatically every time you save changes in Finapp.",
+        key="side_reminder_freq",
+    )
+    if sel_rec[0] != dias_rec_actual:
+        datos["reminder_days"] = sel_rec[0]
+        guardar_datos(datos, registrar_cambio=False)
+        if sel_rec[0] > 0:
+            _notificar_reset_recordatorio_90d(datetime.now(TZ_SYDNEY), days=sel_rec[0], force=True)
+        st.toast(f"🔔 Reminder set to: {sel_rec[1]}")
+
     with st.expander("🔐 Recovery Settings"):
         seg_actual = datos.get("seguridad", {})
         em_conf = st.text_input(
@@ -3389,6 +3445,21 @@ pestana3 = mapa_tabs["⚡ LIVE CASH FLOW"]
 # ============================= TAB 1 =====================================
 # =========================================================================
 with pestana1:
+    try:
+        ts_chk = str(datos.get("ultima_actualizacion_ts") or datos.get("ultima_actualizacion") or "").strip()
+        if ts_chk:
+            dt_chk = datetime.fromisoformat(ts_chk) if "T" in ts_chk else datetime.strptime(ts_chk[:10], "%Y-%m-%d").replace(tzinfo=TZ_SYDNEY)
+            if dt_chk.tzinfo is None:
+                dt_chk = dt_chk.replace(tzinfo=TZ_SYDNEY)
+            dias_limite = int(datos.get("reminder_days", 90))
+            dias_sin_act = (datetime.now(TZ_SYDNEY).date() - dt_chk.astimezone(TZ_SYDNEY).date()).days
+            if dias_limite > 0 and dias_sin_act >= dias_limite:
+                st.warning(
+                    f"⚠️ **Cost Review Due ({dias_limite}-day target):** You haven't updated your costs in **{dias_sin_act} days**. "
+                    "Review your bills and subscriptions to keep up with price changes and inflation."
+                )
+    except Exception:
+        pass
     total_items_costos = len(datos["costos"])
     costos_activos = [c for c in datos["costos"] if c.get("activo", True)]
     total_costos = sum(c["monto"] for c in costos_activos)
