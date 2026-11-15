@@ -7,7 +7,7 @@ import json
 import os
 import io
 import zipfile
-import random
+import randomle
 import smtplib
 import urllib.parse
 from email.mime.text import MIMEText
@@ -65,27 +65,27 @@ def _obtener_gemini_key():
 
 
 def _obtener_binance_keys():
-    k, s = "", ""
+    k, s, r_url, r_sec = "", "", "", ""
     try:
         if hasattr(st, "secrets"):
             k = str(st.secrets.get("binance_api_key", "")).strip()
             s = str(st.secrets.get("binance_api_secret", "")).strip()
+            r_url = str(st.secrets.get("binance_relay_url", "")).strip()
+            r_sec = str(st.secrets.get("binance_relay_secret", "")).strip()
     except Exception:
         pass
     if not k:
         k = os.environ.get("BINANCE_API_KEY", "").strip()
     if not s:
         s = os.environ.get("BINANCE_API_SECRET", "").strip()
-    return k, s
+    if not r_url:
+        r_url = os.environ.get("BINANCE_RELAY_URL", "").strip()
+    if not r_sec:
+        r_sec = os.environ.get("BINANCE_RELAY_SECRET", "").strip()
+    return k, s, r_url, r_sec
 
 
-def _binance_signed_get(path, api_key, api_secret, params=None):
-    base_urls = [
-        "https://api.binance.com",
-        "https://api1.binance.com",
-        "https://api2.binance.com",
-        "https://api3.binance.com",
-    ]
+def _binance_signed_get(path, api_key, api_secret, params=None, relay_url="", relay_secret=""):
     q = dict(params or {})
     q["timestamp"] = int(time.time() * 1000)
     q["recvWindow"] = 10000
@@ -93,6 +93,34 @@ def _binance_signed_get(path, api_key, api_secret, params=None):
     sig = hmac.new(api_secret.encode("utf-8"), query_str.encode("utf-8"), hashlib.sha256).hexdigest()
     full_qs = f"{query_str}&signature={sig}"
     headers = {"X-MBX-APIKEY": api_key}
+
+    if relay_url:
+        try:
+            r_headers = dict(headers)
+            if relay_secret:
+                r_headers["x-relay-secret"] = relay_secret
+            r = requests.get(
+                relay_url.rstrip("/"),
+                params={"path": path, "qs": full_qs},
+                headers=r_headers,
+                timeout=15,
+            )
+            if r.status_code == 200:
+                return r.json(), None
+            try:
+                msg = r.json().get("msg") or r.json().get("error") or r.text[:160]
+            except Exception:
+                msg = r.text[:160]
+            return None, f"Binance relay error ({r.status_code}): {msg}"
+        except Exception as e:
+            return None, f"Binance relay connection error: {e}"
+
+    base_urls = [
+        "https://api.binance.com",
+        "https://api1.binance.com",
+        "https://api2.binance.com",
+        "https://api3.binance.com",
+    ]
 
     last_err = "Could not connect to Binance."
     for base in base_urls:
@@ -117,14 +145,14 @@ def _binance_signed_get(path, api_key, api_secret, params=None):
 
 
 @st.cache_data(ttl=120, show_spinner=False)
-def obtener_binance_portfolio(api_key, api_secret, usd_to_aud_rate=1.55, refresh_nonce=0):
+def obtener_binance_portfolio(api_key, api_secret, usd_to_aud_rate=1.55, refresh_nonce=0, relay_url="", relay_secret=""):
     if not api_key or not api_secret:
         return [], "Missing Binance API credentials."
 
     holdings = {}  # (asset, wallet_label) -> qty
 
     # 1. Spot Wallet (skip LD* wrapped Simple Earn tokens to avoid double counting)
-    spot_data, err = _binance_signed_get("/api/v3/account", api_key, api_secret, {"omitZeroBalances": "true"})
+    spot_data, err = _binance_signed_get("/api/v3/account", api_key, api_secret, {"omitZeroBalances": "true"}, relay_url=relay_url, relay_secret=relay_secret)
     if err:
         return [], err
     for bal in (spot_data or {}).get("balances", []):
@@ -136,7 +164,7 @@ def obtener_binance_portfolio(api_key, api_secret, usd_to_aud_rate=1.55, refresh
         holdings[key] = holdings.get(key, 0.0) + qty
 
     # 2. Simple Earn Flexible (best-effort)
-    flex_data, _ = _binance_signed_get("/sapi/v1/simple-earn/flexible/position", api_key, api_secret, {"size": 100})
+    flex_data, _ = _binance_signed_get("/sapi/v1/simple-earn/flexible/position", api_key, api_secret, {"size": 100}, relay_url=relay_url, relay_secret=relay_secret)
     for row in (flex_data or {}).get("rows", []):
         asset = str(row.get("asset", "")).upper().strip()
         qty = float(row.get("totalAmount", 0) or 0)
@@ -145,7 +173,7 @@ def obtener_binance_portfolio(api_key, api_secret, usd_to_aud_rate=1.55, refresh
             holdings[key] = holdings.get(key, 0.0) + qty
 
     # 3. Simple Earn Locked (best-effort)
-    lock_data, _ = _binance_signed_get("/sapi/v1/simple-earn/locked/position", api_key, api_secret, {"size": 100})
+    lock_data, _ = _binance_signed_get("/sapi/v1/simple-earn/locked/position", api_key, api_secret, {"size": 100}, relay_url=relay_url, relay_secret=relay_secret)
     for row in (lock_data or {}).get("rows", []):
         asset = str(row.get("asset", "")).upper().strip()
         qty = float(row.get("amount", 0) or 0)
@@ -351,13 +379,11 @@ def obtener_transacciones_up_bank(token, days_back=30, refresh_nonce=0, max_page
         return [], f"Connection error: {e}"
 
 
-def clasificar_transaccion_up(tx, flatmate_keywords=None):
+def clasificar_transaccion_up(tx, own_account_ids=None):
     attrs = tx.get("attributes", {})
     rels = tx.get("relationships", {})
     desc = (attrs.get("description") or "").strip()
     msg = (attrs.get("message") or "").strip()
-    raw_text = (attrs.get("rawText") or "").strip()
-    combined = f"{desc} {msg} {raw_text}".upper()
 
     amt_obj = attrs.get("amount", {})
     amount_aud = float(amt_obj.get("value", 0.0))
@@ -368,31 +394,31 @@ def clasificar_transaccion_up(tx, flatmate_keywords=None):
     except Exception:
         dt_syd = datetime.now(TZ_SYDNEY)
 
-    is_internal_up = rels.get("transferAccount", {}).get("data") is not None
-    up_cat = (rels.get("category", {}).get("data") or {}).get("id") or ""
-    is_commbank_loop = (
-        any(k in combined for k in ["COMMBANK", "COMMONWEALTH", "CBA"])
-        and abs(abs(amount_aud) - 2000.0) <= 5.0
-    )
+    # Verify internal transfer ownership via Up API relationships.transferAccount
+    transfer_data = (rels.get("transferAccount") or {}).get("data")
+    needs_review = False
+    is_internal_up = False
+    if isinstance(transfer_data, dict) and transfer_data.get("id"):
+        target_id = transfer_data.get("id")
+        if own_account_ids is None or target_id in own_account_ids:
+            is_internal_up = True
+        else:
+            # Counterparty account ID is not confirmed among own Up accounts -> flag for review, do NOT auto-exclude
+            needs_review = True
 
-    if is_commbank_loop:
-        tag = "🔁 CommBank $2k Loop"
-    elif is_internal_up:
+    up_cat = (rels.get("category", {}).get("data") or {}).get("id") or ""
+
+    if is_internal_up:
         tag = "🔄 Internal Up Transfer"
+    elif needs_review:
+        tag = "⚠️ Review Transfer"
+    elif up_cat:
+        prefix = "💵" if amount_aud > 0 else "💳"
+        tag = f"{prefix} {up_cat.replace('-', ' ').title()}"
     elif amount_aud > 0:
-        if any(k in combined for k in ["ME GROUP", "CG RECRUITMENT", "PINNACLE", "PARKHOUNT"]):
-            tag = "💼 Wages / Salary"
-        elif flatmate_keywords and any(k.strip().upper() in combined for k in flatmate_keywords if k.strip()):
-            tag = "🏠 Flatmates / Bills"
-        elif any(k in combined for k in ["RENT", "WIFI", "ELECTRIC", "WATER", "BILLS"]):
-            tag = "🏠 Flatmates / Bills"
-        else:
-            tag = "💵 Other Income"
+        tag = "💵 Incoming Payment"
     else:
-        if up_cat:
-            tag = f"💳 {up_cat.replace('-', ' ').title()}"
-        else:
-            tag = "💳 Everyday Expense"
+        tag = "💳 Outgoing Expense"
 
     return {
         "Date": dt_syd.strftime("%Y-%m-%d %H:%M"),
@@ -402,8 +428,8 @@ def clasificar_transaccion_up(tx, flatmate_keywords=None):
         "Tag": tag,
         "Status": status,
         "Amount (AUD)": amount_aud,
-        "is_commbank_loop": is_commbank_loop,
         "is_internal_up": is_internal_up,
+        "needs_review": needs_review,
     }
 
 
@@ -906,7 +932,38 @@ def activar_interactividad_avanzada(cats_costos=None, cats_ingresos=None, ubicac
         }
 
         function actualizarInterfaz() {
-            posicionarChatbotFlotante();
+            function actualizarRelojGuardado() {
+            const el = doc.getElementById('finapp-last-saved');
+            if (!el) return;
+            const iso = el.getAttribute('data-saved-ts');
+            if (!iso) return;
+            const savedMs = Date.parse(iso);
+            if (isNaN(savedMs)) return;
+            const now = new Date();
+            const diffSec = Math.max(0, Math.floor((now.getTime() - savedMs) / 1000));
+            const savedDate = new Date(savedMs);
+            const dayDiff = Math.floor((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - new Date(savedDate.getFullYear(), savedDate.getMonth(), savedDate.getDate())) / 86400000);
+            let txt = 'Last saved just now';
+            if (diffSec < 60) {
+                txt = 'Last saved just now';
+            } else if (diffSec < 3600) {
+                const m = Math.floor(diffSec / 60);
+                txt = 'Last saved ' + (m === 1 ? '1 minute ago' : m + ' minutes ago');
+            } else if (dayDiff <= 0) {
+                const h = Math.floor(diffSec / 3600);
+                txt = 'Last saved ' + (h === 1 ? '1 hour ago' : h + ' hours ago');
+            } else if (dayDiff === 1) {
+                txt = 'Last saved yesterday';
+            } else {
+                txt = 'Last saved ' + dayDiff + ' days ago';
+            }
+            if (el.textContent !== txt) el.textContent = txt;
+        }
+        actualizarRelojGuardado();
+        if (!win._finappLastSavedTimer) {
+            win._finappLastSavedTimer = win.setInterval(actualizarRelojGuardado, 15000);
+        }
+        posicionarChatbotFlotante();
             estilizarSolapas();
             limpiarInputsYPopups();
             estilizarSolapasYBotonesOrden();
@@ -1676,27 +1733,70 @@ def cargar_datos():
 
 
 def guardar_datos(datos, registrar_cambio=True):
+    ahora_syd = datetime.now(TZ_SYDNEY)
+    prev_fecha = datos.get("ultima_actualizacion")
+    prev_ts = datos.get("ultima_actualizacion_ts")
     if registrar_cambio:
-        datos["ultima_actualizacion"] = datetime.now(TZ_SYDNEY).strftime("%Y-%m-%d")
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(datos, f, ensure_ascii=False, indent=4)
+        datos["ultima_actualizacion"] = ahora_syd.strftime("%Y-%m-%d")
+        datos["ultima_actualizacion_ts"] = ahora_syd.isoformat()
+    try:
+        with open(DATA_FILE, "w", encoding="utf-8") as f:
+            json.dump(datos, f, ensure_ascii=False, indent=4)
+        st.session_state["finapp_unsaved_changes"] = False
+        return True
+    except Exception:
+        if registrar_cambio:
+            if prev_fecha is not None:
+                datos["ultima_actualizacion"] = prev_fecha
+            if prev_ts is not None:
+                datos["ultima_actualizacion_ts"] = prev_ts
+        st.session_state["finapp_unsaved_changes"] = True
+        return False
 
 
 def calcular_texto_ultima_actualizacion(datos, fecha_actual_sydney):
+    if st.session_state.get("finapp_unsaved_changes", False):
+        return "Unsaved changes", ""
+
+    ts_str = str(datos.get("ultima_actualizacion_ts", "") or "").strip()
+    if ts_str:
+        try:
+            dt_saved = datetime.fromisoformat(ts_str)
+            if dt_saved.tzinfo is None:
+                dt_saved = dt_saved.replace(tzinfo=TZ_SYDNEY)
+            diff_sec = max(0, int((fecha_actual_sydney - dt_saved).total_seconds()))
+            dias_diff = max(0, (fecha_actual_sydney.date() - dt_saved.astimezone(TZ_SYDNEY).date()).days)
+            if diff_sec < 60:
+                return "Last saved just now", dt_saved.isoformat()
+            elif diff_sec < 3600:
+                mins = diff_sec // 60
+                lbl = "1 minute ago" if mins == 1 else f"{mins} minutes ago"
+                return f"Last saved {lbl}", dt_saved.isoformat()
+            elif dias_diff == 0:
+                hrs = diff_sec // 3600
+                lbl = "1 hour ago" if hrs == 1 else f"{hrs} hours ago"
+                return f"Last saved {lbl}", dt_saved.isoformat()
+            elif dias_diff == 1:
+                return "Last saved yesterday", dt_saved.isoformat()
+            else:
+                return f"Last saved {dias_diff} days ago", dt_saved.isoformat()
+        except Exception:
+            pass
+
     fecha_str = str(datos.get("ultima_actualizacion", "") or "").strip()
     if not fecha_str:
-        return "Last saved: Today"
+        return "Last saved just now", ""
     try:
         fecha_guardada = datetime.strptime(fecha_str[:10], "%Y-%m-%d").date()
         dias_diff = max(0, (fecha_actual_sydney.date() - fecha_guardada).days)
         if dias_diff == 0:
-            return "Last saved: Today"
+            return "Last saved today", ""
         elif dias_diff == 1:
-            return "Last saved: 1 day ago"
+            return "Last saved yesterday", ""
         else:
-            return f"Last saved: {dias_diff} days ago"
+            return f"Last saved {dias_diff} days ago", ""
     except Exception:
-        return "Last saved: Today"
+        return "Last saved just now", ""
 
 
 # ----------------- EXCEL (.XLSX) EXPORT ON LOGOUT (AUD ONLY) -----------------
@@ -2614,8 +2714,8 @@ if not st.session_state.autenticado:
         st.markdown("""
         <div class="jardin-login-box">
             <div style="font-size: 2.3rem; line-height: 1;">💳</div>
-            <div class="jardin-login-title">Sign in to Finapp</div>
-            <div class="jardin-login-sub">Your personal space for financial clarity (AUD)</div>
+            <div class="jardin-login-title">Finapp</div>
+            <div class="jardin-login-sub">Your personal space for financial clarity</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -2811,7 +2911,7 @@ meses = {
 dia_str = dias[ahora.weekday()]
 mes_str = meses[ahora.month]
 fecha_texto = f"Today is {dia_str}, {mes_str} {ahora.day}"
-ultima_act_texto = calcular_texto_ultima_actualizacion(datos, ahora)
+ultima_act_texto, ultima_act_iso = calcular_texto_ultima_actualizacion(datos, ahora)
 stamp_archivo = ahora.strftime("%Y-%m-%d_%H-%M")
 
 if "confirmar_cierre" not in st.session_state:
@@ -2883,7 +2983,8 @@ with st.sidebar:
         st.rerun()
 
     st.markdown(
-        f"<div style='text-align: center; color: #6B7280; font-size: 0.85rem; margin-top: 8px;'>🕒 {ultima_act_texto}</div>",
+        f"<div style='text-align: center; color: #6B7280; font-size: 0.85rem; margin-top: 8px;'>🕒 "
+        f"<span id='finapp-last-saved' data-saved-ts='{ultima_act_iso}'>{ultima_act_texto}</span></div>",
         unsafe_allow_html=True,
     )
 
@@ -3591,38 +3692,33 @@ with pestana2:
             "Active_Flag": esta_activo
         })
 
-    bn_key, bn_sec = _obtener_binance_keys()
+    bn_key, bn_sec, bn_r_url, bn_r_sec = _obtener_binance_keys()
     if bn_key and bn_sec:
-        c_bn1, c_bn2 = st.columns([2.5, 2.5])
-        usar_binance_live = c_bn1.checkbox(
+        usar_binance_live = st.checkbox(
             "🟡 Sync Live Binance (Spot + Simple Earn)",
             value=True,
             key="tab2_sync_binance_live",
         )
-        ocultar_polvo_bn = c_bn2.checkbox(
-            "Hide dust (< $0.50 AUD)",
-            value=True,
-            key="tab2_hide_binance_dust",
-        )
         if usar_binance_live:
-            bn_rows, bn_err = obtener_binance_portfolio(bn_key, bn_sec, usd_to_aud)
+            bn_rows, bn_err = obtener_binance_portfolio(bn_key, bn_sec, usd_to_aud, relay_url=bn_r_url, relay_secret=bn_r_sec)
             if bn_err:
                 st.warning(f"⚠️ {bn_err}")
             else:
                 for b in bn_rows:
-                    if ocultar_polvo_bn and b["val_aud"] < 0.50:
+                    val_b = float(b.get("val_aud", 0.0) or 0.0)
+                    if val_b < 2.0:
                         continue
                     filas.append({
                         "Type": "Cryptos",
                         "Asset": f"{b['asset']} (Binance)",
                         "Symbol": b["asset"],
                         "Platform": b["wallet"],
-                        "Quantity_Num": b["qty"],
-                        "Quantity": formatear_cant(b["qty"]),
-                        "Price_Unit_AUD": b["price_aud"],
-                        "Price_Valid": b["price_aud"] > 0,
+                        "Quantity_Num": float(b["qty"] or 0.0),
+                        "Quantity": formatear_cant(float(b["qty"] or 0.0)),
+                        "Price_Unit_AUD": float(b["price_aud"] or 0.0),
+                        "Price_Valid": float(b["price_aud"] or 0.0) > 0,
                         "Live Quote": b["quote_str"],
-                        "Value (AUD)": b["val_aud"],
+                        "Value (AUD)": val_b,
                         "Active_Flag": True,
                     })
 
@@ -3635,11 +3731,15 @@ with pestana2:
 
     df_inv_todos = pd.DataFrame(filas)
     if not df_inv_todos.empty:
-        df_inv_activos = df_inv_todos[df_inv_todos["Active_Flag"] == True]
+        df_inv_todos["Value (AUD)"] = pd.to_numeric(df_inv_todos["Value (AUD)"], errors="coerce").fillna(0.0)
+        df_inv_activos = df_inv_todos[
+            (df_inv_todos["Active_Flag"] == True)
+            & ~((df_inv_todos["Type"] == "Cryptos") & (df_inv_todos["Value (AUD)"] < 2.0))
+        ].copy()
     else:
         df_inv_activos = pd.DataFrame()
 
-    total_patrimonio_aud = df_inv_activos["Value (AUD)"].sum() if not df_inv_activos.empty else 0.0
+    total_patrimonio_aud = float(df_inv_activos["Value (AUD)"].sum()) if not df_inv_activos.empty else 0.0
 
     costos_activos_live = [c for c in datos.get("costos", []) if c.get("activo", True)]
     ingresos_activos_live = [i for i in datos.get("ingresos", []) if i.get("activo", True)]
@@ -3650,7 +3750,7 @@ with pestana2:
     html_panel_salud = construir_html_panel_patrimonio(
         total_patrimonio_aud=total_patrimonio_aud,
         cant_activos_contemplados=len(df_inv_activos),
-        cant_activos_totales=len(inversiones),
+        cant_activos_totales=len(df_inv_todos),
         ingreso_mensual_aud=ingreso_mensual_vivir_aud,
         costo_mensual_aud=costo_mensual_vivir_aud,
         datos_faltantes=datos_cyi_faltantes
@@ -4296,15 +4396,10 @@ with pestana3:
             (365, "Last year"),
             (None, "All time"),
         ]
-        if "up_hide_cba_loop" not in st.session_state:
-            st.session_state["up_hide_cba_loop"] = True
         if "up_hide_internal" not in st.session_state:
             st.session_state["up_hide_internal"] = True
 
-        n_activos = int(bool(st.session_state["up_hide_cba_loop"])) + int(bool(st.session_state["up_hide_internal"]))
-        etiqueta_filtros = f"{n_activos} active" if n_activos > 0 else "None active"
-
-        c_ctrl1, c_ctrl2, c_ctrl_sp = st.columns([2.2, 2.2, 4.6])
+        c_ctrl1, c_ctrl2, c_ctrl_sp = st.columns([2.2, 2.8, 4.0])
         with c_ctrl1:
             periodo_sel = st.selectbox(
                 "📅 Period",
@@ -4315,30 +4410,12 @@ with pestana3:
             )
             dias_ventana, etiqueta_periodo = periodo_sel
         with c_ctrl2:
-            st.markdown(
-                "<div style='font-size: 0.875rem; line-height: 1.6; margin-bottom: 4px;'>⚙️ Filters</div>",
-                unsafe_allow_html=True,
+            st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+            ocultar_internas_up = st.checkbox(
+                "Exclude internal Up transfers",
+                help="Excludes transfers between your own Up Bank accounts so every external dollar in or out is counted accurately.",
+                key="up_hide_internal",
             )
-            with st.popover(etiqueta_filtros, use_container_width=True):
-                ocultar_loop_cba = st.checkbox(
-                    "Hide CommBank $2k loop",
-                    help="Excludes the $2,000 AUD CommBank fee-waiver transfers so they don't inflate income/expenses.",
-                    key="up_hide_cba_loop",
-                )
-                ocultar_internas_up = st.checkbox(
-                    "Hide internal Up Saver transfers",
-                    help="Excludes transfers between your own Up Spending and Saver accounts.",
-                    key="up_hide_internal",
-                )
-                flatmate_kw_str = st.text_input(
-                    "🏠 Flatmate / Rent keywords",
-                    value=datos.get("up_flatmate_keywords", "JUAN, PEPE, ADRIEN, RENT, WIFI, ELECTRICITY, WATER"),
-                    help="Incoming deposits matching these words are tagged as Flatmates / Bills.",
-                    key="up_flatmate_kw_input",
-                )
-                if flatmate_kw_str != datos.get("up_flatmate_keywords", ""):
-                    datos["up_flatmate_keywords"] = flatmate_kw_str
-                    guardar_datos(datos, registrar_cambio=False)
 
         cuentas_up, err_cuentas = obtener_cuentas_up_bank(
             up_token_activo, st.session_state["up_refresh_nonce"]
@@ -4361,19 +4438,22 @@ with pestana3:
                 for idx_acc, acc in enumerate(cuentas_up[:4]):
                     cols_acc[idx_acc + 1].metric(acc["name"], f"${acc['balance_aud']:,.2f} AUD")
 
-            flatmate_kws = [k.strip() for k in flatmate_kw_str.split(",") if k.strip()]
-            filas_tx = [clasificar_transaccion_up(tx, flatmate_kws) for tx in txs_raw]
+            own_up_ids = {c["id"] for c in (cuentas_up or []) if c.get("id")} if cuentas_up else None
+            filas_tx = [clasificar_transaccion_up(tx, own_up_ids) for tx in txs_raw]
             df_up = pd.DataFrame(filas_tx)
 
             if df_up.empty:
                 st.info(f"No Up Bank transactions found for: {etiqueta_periodo}.")
             else:
                 df_filtrado = df_up.copy()
-                if ocultar_loop_cba:
-                    df_filtrado = df_filtrado[~df_filtrado["is_commbank_loop"]]
                 if ocultar_internas_up:
                     df_filtrado = df_filtrado[~df_filtrado["is_internal_up"]]
 
+                n_review = int(df_filtrado["needs_review"].sum()) if "needs_review" in df_filtrado.columns else 0
+                if n_review > 0:
+                    st.info(
+                        f"⚠️ {n_review} transfer(s) could not be confirmed as your own Up Bank account and were kept in Cash Flow for your review."
+                    )
                 incomes_aud = df_filtrado[df_filtrado["Amount (AUD)"] > 0]["Amount (AUD)"].sum()
                 expenses_aud = abs(df_filtrado[df_filtrado["Amount (AUD)"] < 0]["Amount (AUD)"].sum())
                 net_aud = incomes_aud - expenses_aud
@@ -4382,13 +4462,13 @@ with pestana3:
                 k1.markdown(
                     f'<div class="metric-card metric-card-ingresos"><h4>Live Income ({etiqueta_periodo})</h4>'
                     f'<div class="valor-principal">${incomes_aud:,.2f} AUD</div>'
-                    f'<div class="subtexto">Wages, flatmates & deposits</div></div>',
+                    f'<div class="subtexto">All external incoming funds</div></div>',
                     unsafe_allow_html=True,
                 )
                 k2.markdown(
                     f'<div class="metric-card metric-card-costos"><h4>Live Expenses ({etiqueta_periodo})</h4>'
                     f'<div class="valor-principal">${expenses_aud:,.2f} AUD</div>'
-                    f'<div class="subtexto">Tap-and-pay & outgoing</div></div>',
+                    f'<div class="subtexto">All external outgoing payments</div></div>',
                     unsafe_allow_html=True,
                 )
                 clase_net = "metric-card-lila" if net_aud >= 0 else "metric-card-neutro"
@@ -4499,11 +4579,11 @@ with st.popover("💬 AI Advisor"):
                 )
             )
 
-        bn_k_c, bn_s_c = _obtener_binance_keys()
+        bn_k_c, bn_s_c, bn_ru_c, bn_rs_c = _obtener_binance_keys()
         if bn_k_c and bn_s_c:
-            bn_rows_c, bn_err_c = obtener_binance_portfolio(bn_k_c, bn_s_c, usd_to_aud)
+            bn_rows_c, bn_err_c = obtener_binance_portfolio(bn_k_c, bn_s_c, usd_to_aud, relay_url=bn_ru_c, relay_secret=bn_rs_c)
             if bn_rows_c and not bn_err_c:
-                bn_vis = [x for x in bn_rows_c if x["val_aud"] >= 0.50]
+                bn_vis = [x for x in bn_rows_c if float(x.get("val_aud", 0.0) or 0.0) >= 2.0]
                 tot_bn = sum(x["val_aud"] for x in bn_vis)
                 resumen_ctx.append(
                     f"Live Binance Portfolio Total: ${tot_bn:,.2f} AUD | "
@@ -4519,11 +4599,10 @@ with st.popover("💬 AI Advisor"):
                 )
             txs_c, err_t = obtener_transacciones_up_bank(up_tok, 30, st.session_state.get("up_refresh_nonce", 0))
             if txs_c and not err_t:
-                kw_list = [k.strip() for k in datos.get("up_flatmate_keywords", "JUAN, PEPE, ADRIEN, RENT, WIFI, ELECTRICITY, WATER").split(",") if k.strip()]
-                parsed_c = [clasificar_transaccion_up(t, kw_list) for t in txs_c]
-                parsed_c = [p for p in parsed_c if not p["is_commbank_loop"] and not p["is_internal_up"]]
+                parsed_c = [clasificar_transaccion_up(t) for t in txs_c]
+                parsed_c = [p for p in parsed_c if not p["is_internal_up"]]
                 resumen_ctx.append(
-                    "Recent Up Bank Transactions (last 30d, CommBank $2k loop & internal transfers excluded): "
+                    "Recent Up Bank Transactions (last 30d, internal Up transfers excluded): "
                     + "; ".join(f"{p['Date'][:10]} | {p['Description']} | {p['Tag']} | ${p['Amount (AUD)']:,.2f} AUD" for p in parsed_c[:45])
                 )
 
