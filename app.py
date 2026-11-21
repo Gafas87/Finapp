@@ -3569,7 +3569,7 @@ def _html_gauge_cluster_card(cfg, val_aud, idx=0, super_aud=None):
     max_int = int(round(max_val))
     angle_target = max(0.0, min(180.0, (float(val_aud) / max_val) * 180.0))
 
-    cx, cy, r = 150.0, 142.0, 108.0
+    cx, cy, r = 150.0, 138.0, 106.0
 
     def pt(ang_deg, rad=r):
         rad_a = _m.radians(180.0 - ang_deg)
@@ -3586,21 +3586,21 @@ def _html_gauge_cluster_card(cfg, val_aud, idx=0, super_aud=None):
         large_arc = 1 if (a2 - a1) > 180 else 0
         arc_paths.append(
             f'<path d="M {x1:.2f} {y1:.2f} A {r} {r} 0 {large_arc} 1 {x2:.2f} {y2:.2f}" '
-            f'fill="none" stroke="{z_col}" stroke-width="13" stroke-linecap="butt" '
-            f'style="filter: drop-shadow(0 0 6px {z_col}88);"/>'
+            f'fill="none" stroke="{z_col}" stroke-width="11" stroke-linecap="butt" '
+            f'style="filter: drop-shadow(0 2px 5px {z_col}55);"/>'
         )
 
     ticks = []
     for t_i in range(0, 21):
         ang = t_i * 9.0
         is_maj = (t_i % 5 == 0)
-        r_in = r - (15 if is_maj else 11)
+        r_in = r - (16 if is_maj else 11)
         r_out = r - 7
         tx1, ty1 = pt(ang, r_in)
         tx2, ty2 = pt(ang, r_out)
-        sw = "1.6" if is_maj else "0.9"
-        col_t = "#94A3B8" if is_maj else "#475569"
-        ticks.append(f'<line x1="{tx1:.1f}" y1="{ty1:.1f}" x2="{tx2:.1f}" y2="{ty2:.1f}" stroke="{col_t}" stroke-width="{sw}"/>')
+        sw = "1.7" if is_maj else "0.9"
+        col_t = "#475569" if is_maj else "#CBD5E1"
+        ticks.append(f'<line x1="{tx1:.1f}" y1="{ty1:.1f}" x2="{tx2:.1f}" y2="{ty2:.1f}" stroke="{col_t}" stroke-width="{sw}" stroke-linecap="round"/>')
 
     def fmt_k(n):
         if n >= 1000 and n % 1000 == 0:
@@ -3644,43 +3644,38 @@ def _html_gauge_cluster_card(cfg, val_aud, idx=0, super_aud=None):
     overflow: hidden;
   }}
   .cluster-card {{
-    background:
-      radial-gradient(circle at 50% 25%, #1A202C 0%, #0E1116 72%),
-      repeating-linear-gradient(45deg, rgba(255,255,255,0.015) 0px, rgba(255,255,255,0.015) 2px, transparent 2px, transparent 4px);
-    border: 1.5px solid #2B3340;
-    border-radius: 20px;
-    padding: 12px 12px 14px 12px;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 10px 24px rgba(0,0,0,0.35);
+    background: transparent;
+    padding: 6px 6px 8px 6px;
     text-align: center;
-    color: #F8FAFC;
+    color: #0F172A;
   }}
-  .gauge-top {{
+  .gauge-head {{
     display: flex;
-    justify-content: space-between;
+    justify-content: center;
     align-items: center;
+    gap: 8px;
     margin-bottom: 2px;
-    padding: 0 4px;
   }}
   .gauge-title {{
-    font-size: 0.80rem;
+    font-size: 0.84rem;
     font-weight: 800;
     letter-spacing: 0.14em;
-    color: #E2E8F0;
+    color: #0F172A;
     text-transform: uppercase;
   }}
   .status-chip {{
-    font-size: 0.68rem;
+    font-size: 0.65rem;
     font-weight: 800;
     letter-spacing: 0.08em;
     padding: 2px 8px;
     border-radius: 999px;
-    background: {estado_col}22;
+    background: {estado_col}1A;
     color: {estado_col};
-    border: 1px solid {estado_col}88;
+    border: 1px solid {estado_col}66;
   }}
   svg {{
     width: 100%;
-    max-width: 280px;
+    max-width: 286px;
     height: auto;
     display: block;
     margin: 0 auto;
@@ -3690,11 +3685,11 @@ def _html_gauge_cluster_card(cfg, val_aud, idx=0, super_aud=None):
     display: inline-flex;
     align-items: center;
     gap: 2px;
-    background: linear-gradient(180deg, #05070A 0%, #11161E 50%, #05070A 100%);
-    border: 1.5px solid #334155;
-    border-radius: 8px;
-    padding: 4px 8px;
-    box-shadow: inset 0 2px 5px rgba(0,0,0,0.85);
+    background: linear-gradient(180deg, #0B0F17 0%, #161E2B 52%, #0B0F17 100%);
+    border: 1.5px solid #CBD5E1;
+    border-radius: 9px;
+    padding: 4px 9px;
+    box-shadow: inset 0 2px 5px rgba(0,0,0,0.85), 0 3px 10px rgba(15,23,42,0.10);
     margin-top: -6px;
   }}
   .odo-cell {{
@@ -3706,9 +3701,9 @@ def _html_gauge_cluster_card(cfg, val_aud, idx=0, super_aud=None):
     font-family: 'JetBrains Mono', 'Courier New', monospace;
     font-size: 1.02rem;
     font-weight: 800;
-    color: #F8FAFC;
-    background: rgba(255,255,255,0.03);
-    border-right: 1px solid #1E293B;
+    color: #FFFFFF;
+    background: rgba(255,255,255,0.04);
+    border-right: 1px solid #334155;
   }}
   .odo-cell:last-of-type {{ border-right: none; }}
   .odo-sep {{
@@ -3720,47 +3715,54 @@ def _html_gauge_cluster_card(cfg, val_aud, idx=0, super_aud=None):
   .odo-aud {{
     font-size: 0.68rem;
     font-weight: 700;
-    color: #94A3B8;
+    color: #CBD5E1;
     margin-left: 5px;
     letter-spacing: 0.06em;
   }}
   .inv-sub-row {{
-    margin-top: 7px;
+    margin-top: 6px;
     font-size: 0.72rem;
-    color: #94A3B8;
+    color: #475569;
     letter-spacing: 0.04em;
   }}
-  .inv-sub-row b {{ color: #E2E8F0; font-family: monospace; font-size: 0.78rem; }}
-  .inv-dot {{ margin: 0 6px; color: #475569; }}
+  .inv-sub-row b {{ color: #0F172A; font-family: monospace; font-size: 0.78rem; }}
+  .inv-dot {{ margin: 0 6px; color: #94A3B8; }}
 </style>
 </head>
 <body>
   <div class="cluster-card" id="{uid}_card">
-    <div class="gauge-top">
+    <div class="gauge-head">
       <span class="gauge-title">{cfg['name']}</span>
       <span class="status-chip">{estado}</span>
     </div>
-    <svg viewBox="0 0 300 162">
+    <svg viewBox="0 0 300 158">
       <defs>
         <filter id="{uid}_shadow" x="-30%" y="-30%" width="160%" height="160%">
-          <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#000000" flood-opacity="0.75"/>
+          <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0F172A" flood-opacity="0.32"/>
         </filter>
-        <radialGradient id="{uid}_hub" cx="40%" cy="35%" r="65%">
-          <stop offset="0%" stop-color="#475569"/>
+        <radialGradient id="{uid}_dial" cx="50%" cy="95%" r="85%">
+          <stop offset="0%" stop-color="#FFFFFF"/>
+          <stop offset="80%" stop-color="#F8FAFC"/>
+          <stop offset="100%" stop-color="#F1F5F9"/>
+        </radialGradient>
+        <radialGradient id="{uid}_hub" cx="38%" cy="32%" r="68%">
+          <stop offset="0%" stop-color="#64748B"/>
           <stop offset="55%" stop-color="#1E293B"/>
-          <stop offset="100%" stop-color="#090D14"/>
+          <stop offset="100%" stop-color="#0F172A"/>
         </radialGradient>
       </defs>
-      <path d="M 42 142 A 108 108 0 0 1 258 142" fill="none" stroke="#1E2430" stroke-width="15"/>
+      <!-- Modern circular-arc dial backdrop (no dark square box) -->
+      <path d="M 30 138 A 120 120 0 0 1 270 138 Z" fill="url(#{uid}_dial)" stroke="#E2E8F0" stroke-width="1.2"/>
+      <path d="M 44 138 A 106 106 0 0 1 256 138" fill="none" stroke="#E2E8F0" stroke-width="12"/>
       {''.join(arc_paths)}
       {''.join(ticks)}
-      <text x="26" y="156" fill="#94A3B8" font-size="10.5" font-weight="700" text-anchor="middle">0</text>
-      <text x="150" y="21" fill="#94A3B8" font-size="10.5" font-weight="700" text-anchor="middle">{mid_lbl}</text>
-      <text x="274" y="156" fill="#94A3B8" font-size="10.5" font-weight="700" text-anchor="middle">{max_lbl}</text>
-      <g id="{uid}_needle" transform="rotate(-90 150 142)" filter="url(#{uid}_shadow)">
-        <polygon points="148,142 152,142 150.8,44 149.2,44" fill="#FF5722"/>
+      <text x="20" y="152" fill="#64748B" font-size="10.5" font-weight="700" text-anchor="middle">0</text>
+      <text x="150" y="14" fill="#475569" font-size="10.5" font-weight="700" text-anchor="middle">{mid_lbl}</text>
+      <text x="280" y="152" fill="#64748B" font-size="10.5" font-weight="700" text-anchor="middle">{max_lbl}</text>
+      <g id="{uid}_needle" transform="rotate(-90 150 138)" filter="url(#{uid}_shadow)">
+        <polygon points="147.8,138 152.2,138 150.7,40 149.3,40" fill="#FF4D2A"/>
       </g>
-      <circle cx="150" cy="142" r="12" fill="url(#{uid}_hub)" stroke="#475569" stroke-width="1.5"/>
+      <circle cx="150" cy="138" r="11" fill="url(#{uid}_hub)" stroke="#CBD5E1" stroke-width="1.5"/>
     </svg>
     <div class="odo-wrap" id="{uid}_odo">{cells_html}<span class="odo-aud">AUD</span></div>
     {extra_inv_html}
@@ -3799,13 +3801,13 @@ def _html_gauge_cluster_card(cfg, val_aud, idx=0, super_aud=None):
           const p = Math.min(1, (now - start) / duration);
           const eased = easeOutBack(p);
           const curAng = Math.max(0, Math.min(182, targetAngle * eased));
-          needle.setAttribute('transform', 'rotate(' + (curAng - 90).toFixed(2) + ' 150 142)');
+          needle.setAttribute('transform', 'rotate(' + (curAng - 90).toFixed(2) + ' 150 138)');
           const odoEase = 1 - Math.pow(1 - p, 3);
           odo.innerHTML = formatCells(targetVal * odoEase);
           if (p < 1) {{
             requestAnimationFrame(frame);
           }} else {{
-            needle.setAttribute('transform', 'rotate(' + (targetAngle - 90).toFixed(2) + ' 150 142)');
+            needle.setAttribute('transform', 'rotate(' + (targetAngle - 90).toFixed(2) + ' 150 138)');
             odo.innerHTML = formatCells(targetVal);
           }}
         }}
@@ -3819,7 +3821,7 @@ def _html_gauge_cluster_card(cfg, val_aud, idx=0, super_aud=None):
             playIgnition();
           }} else if (!en.isIntersecting) {{
             played = false;
-            needle.setAttribute('transform', 'rotate(-90 150 142)');
+            needle.setAttribute('transform', 'rotate(-90 150 138)');
           }}
         }});
       }}, {{ threshold: 0.15 }});
@@ -3864,13 +3866,6 @@ pestana3 = mapa_tabs["⚡ LIVE CASH FLOW"]
 # ============================= TAB 0: DASHBOARD ==========================
 # =========================================================================
 with pestana0:
-    st.markdown(
-        "<div style='background:#0E1116; border:1.5px solid #262E3B; border-radius:20px; padding:16px 18px 10px 18px; margin-bottom:10px;'>"
-        "<div style='color:#94A3B8; font-size:0.78rem; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; text-align:center;'>"
-        "FINAPP INSTRUMENT CLUSTER · LIVE AUD GAUGES"
-        "</div></div>",
-        unsafe_allow_html=True,
-    )
 
     dash_balances = _obtener_balances_dashboard(datos, usd_to_aud, cotizaciones)
     cfg_guardada = datos.setdefault("dashboard_gauges", {})
