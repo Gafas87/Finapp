@@ -3416,8 +3416,424 @@ def mover_categoria_ingreso(idx_actual, direccion):
         guardar_datos(datos)
 
 
+# ----------------- DASHBOARD (CAR CLUSTER GAUGES) HELPERS -----------------
+DASHBOARD_DEFAULT_GAUGES = [
+    {"id": "essentials", "name": "ESSENTIALS", "max": 4000, "opt_start": 1600, "opt_end": 2200, "is_investments": False},
+    {"id": "treat_yourself", "name": "TREAT YOURSELF", "max": 1000, "opt_start": 400, "opt_end": 550, "is_investments": False},
+    {"id": "trips_goals", "name": "TRIPS & GOALS", "max": 12000, "opt_start": 4800, "opt_end": 6600, "is_investments": False},
+    {"id": "fire_extinguisher", "name": "FIRE EXTINGUISHER", "max": 10000, "opt_start": 4000, "opt_end": 5500, "is_investments": False},
+    {"id": "emergency", "name": "EMERGENCY", "max": 22000, "opt_start": 8800, "opt_end": 12100, "is_investments": False},
+    {"id": "investments", "name": "INVESTMENTS", "max": 40000, "opt_start": 5000, "opt_end": 20000, "is_investments": True},
+]
+
+
+def _obtener_balances_dashboard(datos, usd_to_aud, cotizaciones):
+    balances = {
+        "essentials": 0.0,
+        "treat_yourself": 0.0,
+        "trips_goals": 0.0,
+        "fire_extinguisher": 0.0,
+        "emergency": 0.0,
+        "investments": 0.0,
+        "super": 0.0,
+    }
+
+    # 1. Live Up Bank account balances
+    up_tok = _obtener_up_token() or st.session_state.get("up_temp_token", "")
+    if up_tok:
+        cuentas_up, err_up = obtener_cuentas_up_bank(up_tok, st.session_state.get("up_refresh_nonce", 0))
+        if cuentas_up and not err_up:
+            for acc in cuentas_up:
+                nm = str(acc.get("name", "")).lower()
+                tp = str(acc.get("type", "")).upper()
+                ow = str(acc.get("ownership", "")).upper()
+                bal = float(acc.get("balance_aud", 0.0) or 0.0)
+                if tp == "TRANSACTIONAL":
+                    if ow == "JOINT" or "2up" in nm or "essential" in nm:
+                        balances["essentials"] += bal
+                    else:
+                        balances["treat_yourself"] += bal
+                else:
+                    if "trip" in nm or "goal" in nm or "smile" in nm:
+                        balances["trips_goals"] += bal
+                    elif "fire" in nm or "extinguisher" in nm:
+                        balances["fire_extinguisher"] += bal
+                    elif "emerg" in nm or "mojo" in nm or "sos" in nm:
+                        balances["emergency"] += bal
+
+    # 2. Investments (liquid) & Super (non-liquid) from Net Worth + Live Binance
+    for inv in datos.get("inversiones", []):
+        if not inv.get("activo_inv", True):
+            continue
+        cant = float(inv.get("cantidad", 0) or 0)
+        tipo = normalizar_tipo_activo_inv(inv.get("tipo", "Cash AUD"))
+        activo_nom = str(inv.get("activo", tipo)).strip()
+        plat = str(inv.get("plataforma", "")).strip()
+        simbolo = str(inv.get("simbolo", "")).upper().strip().split(" ")[0]
+        if tipo in ["Cryptos", "Stocks", "Bonds"]:
+            det_t = activo_nom.split(" ")[0].upper()
+            if det_t and det_t not in ["USD", "ARS", "AUD"]:
+                simbolo = det_t
+
+        val_aud = 0.0
+        if tipo == "Cash AUD":
+            val_aud = cant
+        elif tipo == "Cash USD":
+            val_aud = cant * usd_to_aud
+        elif tipo in ["Cryptos", "Stocks"]:
+            p_usd = cotizaciones.get(simbolo)
+            if p_usd is not None and float(p_usd) > 0:
+                val_aud = cant * float(p_usd) * usd_to_aud
+        else:
+            if simbolo and simbolo not in ["AUD", "USD", "ARS"] and simbolo in cotizaciones and float(cotizaciones[simbolo]) > 0:
+                val_aud = cant * float(cotizaciones[simbolo]) * usd_to_aud
+            else:
+                p_u = float(inv.get("precio_unitario_aud", 1.0) or 0)
+                if p_u > 0:
+                    val_aud = cant * p_u
+
+        if tipo == "Cryptos" and val_aud < 2.0:
+            continue
+
+        es_super = any(k in f"{activo_nom} {plat}".lower() for k in ["super", "hostplus", "australiansuper"])
+        if es_super:
+            balances["super"] += val_aud
+        elif tipo in ["Stocks", "Cryptos", "Bonds", "FCI", "Others"]:
+            balances["investments"] += val_aud
+
+    bn_k, bn_s, bn_ru, bn_rs = _obtener_binance_keys()
+    if bn_k and bn_s:
+        bn_rows, bn_err = obtener_binance_portfolio(bn_k, bn_s, usd_to_aud, relay_url=bn_ru, relay_secret=bn_rs)
+        if bn_rows and not bn_err:
+            for b in bn_rows:
+                val_b = float(b.get("val_aud", 0.0) or 0.0)
+                if val_b >= 2.0:
+                    balances["investments"] += val_b
+
+    return balances
+
+
+def _calcular_zonas_gauge(val, cfg):
+    max_val = max(1.0, float(cfg.get("max", 4000)))
+    opt_start = float(cfg.get("opt_start", 0.4 * max_val))
+    opt_end = float(cfg.get("opt_end", 0.55 * max_val))
+    is_inv = bool(cfg.get("is_investments", False))
+
+    if is_inv:
+        dead_end = min(500.0, max_val * 0.25)
+        low_end = max(dead_end, min(opt_start, max_val))
+        ok_end = max(low_end, min(opt_end, max_val))
+        zonas = [
+            (0.0, dead_end, "#E53935", "DEAD"),
+            (dead_end, low_end, "#FB8C00", "LOW"),
+            (low_end, ok_end, "#FBC02D", "OK"),
+            (ok_end, max_val, "#43A047", "NICE"),
+        ]
+        if val <= dead_end:
+            estado, estado_col = "DEAD", "#E53935"
+        elif val <= low_end:
+            estado, estado_col = "LOW", "#FB8C00"
+        elif val <= ok_end:
+            estado, estado_col = "OK", "#FBC02D"
+        else:
+            estado, estado_col = "NICE", "#43A047"
+    else:
+        target = max_val / 2.0
+        dead_end = min(0.05 * target, max_val * 0.25)
+        o_start = max(dead_end, min(opt_start, max_val))
+        o_end = max(o_start, min(opt_end, max_val))
+        zonas = [
+            (0.0, dead_end, "#E53935", "DEAD"),
+            (dead_end, o_start, "#FBC02D", "LOW"),
+            (o_start, o_end, "#43A047", "OPTIMAL"),
+            (o_end, max_val, "#E53935", "EXCESS"),
+        ]
+        if val <= dead_end:
+            estado, estado_col = "DEAD", "#E53935"
+        elif val < o_start:
+            estado, estado_col = "LOW", "#FBC02D"
+        elif val <= o_end:
+            estado, estado_col = "OPTIMAL", "#43A047"
+        else:
+            estado, estado_col = "EXCESS", "#E53935"
+
+    return zonas, estado, estado_col, max_val
+
+
+def _html_gauge_cluster_card(cfg, val_aud, idx=0, super_aud=None):
+    import math as _m
+    zonas, estado, estado_col, max_val = _calcular_zonas_gauge(val_aud, cfg)
+    is_inv = bool(cfg.get("is_investments", False))
+    val_int = max(0, int(round(val_aud)))
+    target_int = int(round(max_val / 2.0))
+    max_int = int(round(max_val))
+    angle_target = max(0.0, min(180.0, (float(val_aud) / max_val) * 180.0))
+
+    cx, cy, r = 150.0, 142.0, 108.0
+
+    def pt(ang_deg, rad=r):
+        rad_a = _m.radians(180.0 - ang_deg)
+        return cx + rad * _m.cos(rad_a), cy - rad * _m.sin(rad_a)
+
+    arc_paths = []
+    for z_start, z_end, z_col, _ in zonas:
+        if z_end <= z_start:
+            continue
+        a1 = (z_start / max_val) * 180.0
+        a2 = (z_end / max_val) * 180.0
+        x1, y1 = pt(a1)
+        x2, y2 = pt(a2)
+        large_arc = 1 if (a2 - a1) > 180 else 0
+        arc_paths.append(
+            f'<path d="M {x1:.2f} {y1:.2f} A {r} {r} 0 {large_arc} 1 {x2:.2f} {y2:.2f}" '
+            f'fill="none" stroke="{z_col}" stroke-width="13" stroke-linecap="butt" '
+            f'style="filter: drop-shadow(0 0 6px {z_col}88);"/>'
+        )
+
+    ticks = []
+    for t_i in range(0, 21):
+        ang = t_i * 9.0
+        is_maj = (t_i % 5 == 0)
+        r_in = r - (15 if is_maj else 11)
+        r_out = r - 7
+        tx1, ty1 = pt(ang, r_in)
+        tx2, ty2 = pt(ang, r_out)
+        sw = "1.6" if is_maj else "0.9"
+        col_t = "#94A3B8" if is_maj else "#475569"
+        ticks.append(f'<line x1="{tx1:.1f}" y1="{ty1:.1f}" x2="{tx2:.1f}" y2="{ty2:.1f}" stroke="{col_t}" stroke-width="{sw}"/>')
+
+    def fmt_k(n):
+        if n >= 1000 and n % 1000 == 0:
+            return f"{n // 1000}k"
+        return f"{n:,}"
+
+    mid_lbl = fmt_k(target_int)
+    max_lbl = fmt_k(max_int) + ("+" if is_inv else "")
+
+    val_str = f"{val_int:,}"
+    cells_html = "".join(
+        f'<span class="odo-sep">,</span>' if ch == "," else f'<span class="odo-cell">{ch}</span>'
+        for ch in val_str
+    )
+
+    extra_inv_html = ""
+    if is_inv and super_aud is not None:
+        sup_int = max(0, int(round(super_aud)))
+        tot_int = val_int + sup_int
+        extra_inv_html = f"""
+        <div class="inv-sub-row">
+          <span>SUPER <b>{sup_int:,} AUD</b></span>
+          <span class="inv-dot">·</span>
+          <span>TOTAL <b>{tot_int:,} AUD</b></span>
+        </div>
+        """
+
+    uid = f"g_{cfg['id']}_{idx}"
+    delay_ms = idx * 90
+
+    return f"""
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  body {{
+    background: transparent;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    overflow: hidden;
+  }}
+  .cluster-card {{
+    background:
+      radial-gradient(circle at 50% 25%, #1A202C 0%, #0E1116 72%),
+      repeating-linear-gradient(45deg, rgba(255,255,255,0.015) 0px, rgba(255,255,255,0.015) 2px, transparent 2px, transparent 4px);
+    border: 1.5px solid #2B3340;
+    border-radius: 20px;
+    padding: 12px 12px 14px 12px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 10px 24px rgba(0,0,0,0.35);
+    text-align: center;
+    color: #F8FAFC;
+  }}
+  .gauge-top {{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2px;
+    padding: 0 4px;
+  }}
+  .gauge-title {{
+    font-size: 0.80rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    color: #E2E8F0;
+    text-transform: uppercase;
+  }}
+  .status-chip {{
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: {estado_col}22;
+    color: {estado_col};
+    border: 1px solid {estado_col}88;
+  }}
+  svg {{
+    width: 100%;
+    max-width: 280px;
+    height: auto;
+    display: block;
+    margin: 0 auto;
+    overflow: visible;
+  }}
+  .odo-wrap {{
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    background: linear-gradient(180deg, #05070A 0%, #11161E 50%, #05070A 100%);
+    border: 1.5px solid #334155;
+    border-radius: 8px;
+    padding: 4px 8px;
+    box-shadow: inset 0 2px 5px rgba(0,0,0,0.85);
+    margin-top: -6px;
+  }}
+  .odo-cell {{
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 24px;
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
+    font-size: 1.02rem;
+    font-weight: 800;
+    color: #F8FAFC;
+    background: rgba(255,255,255,0.03);
+    border-right: 1px solid #1E293B;
+  }}
+  .odo-cell:last-of-type {{ border-right: none; }}
+  .odo-sep {{
+    color: #94A3B8;
+    font-weight: 700;
+    font-size: 0.95rem;
+    padding: 0 1px;
+  }}
+  .odo-aud {{
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #94A3B8;
+    margin-left: 5px;
+    letter-spacing: 0.06em;
+  }}
+  .inv-sub-row {{
+    margin-top: 7px;
+    font-size: 0.72rem;
+    color: #94A3B8;
+    letter-spacing: 0.04em;
+  }}
+  .inv-sub-row b {{ color: #E2E8F0; font-family: monospace; font-size: 0.78rem; }}
+  .inv-dot {{ margin: 0 6px; color: #475569; }}
+</style>
+</head>
+<body>
+  <div class="cluster-card" id="{uid}_card">
+    <div class="gauge-top">
+      <span class="gauge-title">{cfg['name']}</span>
+      <span class="status-chip">{estado}</span>
+    </div>
+    <svg viewBox="0 0 300 162">
+      <defs>
+        <filter id="{uid}_shadow" x="-30%" y="-30%" width="160%" height="160%">
+          <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#000000" flood-opacity="0.75"/>
+        </filter>
+        <radialGradient id="{uid}_hub" cx="40%" cy="35%" r="65%">
+          <stop offset="0%" stop-color="#475569"/>
+          <stop offset="55%" stop-color="#1E293B"/>
+          <stop offset="100%" stop-color="#090D14"/>
+        </radialGradient>
+      </defs>
+      <path d="M 42 142 A 108 108 0 0 1 258 142" fill="none" stroke="#1E2430" stroke-width="15"/>
+      {''.join(arc_paths)}
+      {''.join(ticks)}
+      <text x="26" y="156" fill="#94A3B8" font-size="10.5" font-weight="700" text-anchor="middle">0</text>
+      <text x="150" y="21" fill="#94A3B8" font-size="10.5" font-weight="700" text-anchor="middle">{mid_lbl}</text>
+      <text x="274" y="156" fill="#94A3B8" font-size="10.5" font-weight="700" text-anchor="middle">{max_lbl}</text>
+      <g id="{uid}_needle" transform="rotate(-90 150 142)" filter="url(#{uid}_shadow)">
+        <polygon points="148,142 152,142 150.8,44 149.2,44" fill="#FF5722"/>
+      </g>
+      <circle cx="150" cy="142" r="12" fill="url(#{uid}_hub)" stroke="#475569" stroke-width="1.5"/>
+    </svg>
+    <div class="odo-wrap" id="{uid}_odo">{cells_html}<span class="odo-aud">AUD</span></div>
+    {extra_inv_html}
+  </div>
+  <script>
+    (function() {{
+      const needle = document.getElementById('{uid}_needle');
+      const odo = document.getElementById('{uid}_odo');
+      const targetAngle = {angle_target:.2f};
+      const targetVal = {val_int};
+      let played = false;
+
+      function formatCells(n) {{
+        const s = Math.max(0, Math.round(n)).toLocaleString('en-US');
+        let h = '';
+        for (const ch of s) {{
+          h += ch === ',' ? '<span class="odo-sep">,</span>' : '<span class="odo-cell">' + ch + '</span>';
+        }}
+        return h + '<span class="odo-aud">AUD</span>';
+      }}
+
+      function easeOutBack(t) {{
+        const c1 = 1.15;
+        const c3 = c1 + 1;
+        return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+      }}
+
+      function playIgnition() {{
+        const duration = 1800;
+        const start = performance.now() + {delay_ms};
+        function frame(now) {{
+          if (now < start) {{
+            requestAnimationFrame(frame);
+            return;
+          }}
+          const p = Math.min(1, (now - start) / duration);
+          const eased = easeOutBack(p);
+          const curAng = Math.max(0, Math.min(182, targetAngle * eased));
+          needle.setAttribute('transform', 'rotate(' + (curAng - 90).toFixed(2) + ' 150 142)');
+          const odoEase = 1 - Math.pow(1 - p, 3);
+          odo.innerHTML = formatCells(targetVal * odoEase);
+          if (p < 1) {{
+            requestAnimationFrame(frame);
+          }} else {{
+            needle.setAttribute('transform', 'rotate(' + (targetAngle - 90).toFixed(2) + ' 150 142)');
+            odo.innerHTML = formatCells(targetVal);
+          }}
+        }}
+        requestAnimationFrame(frame);
+      }}
+
+      const obs = new IntersectionObserver((entries) => {{
+        entries.forEach(en => {{
+          if (en.isIntersecting && !played) {{
+            played = true;
+            playIgnition();
+          }} else if (!en.isIntersecting) {{
+            played = false;
+            needle.setAttribute('transform', 'rotate(-90 150 142)');
+          }}
+        }});
+      }}, {{ threshold: 0.15 }});
+      obs.observe(document.getElementById('{uid}_card'));
+    }})();
+  </script>
+</body>
+</html>
+"""
+
+
 # ----------------- MAIN TABS (REORDERABLE) -----------------
 DEFAULT_TAB_ORDER = [
+    "🎛️ DASHBOARD",
     "📊 COSTS & INCOME",
     "💼 TOTAL NET WORTH",
     "⚡ LIVE CASH FLOW"
@@ -3439,9 +3855,73 @@ if st.button("⇄", key="btn_cycle_tabs_order", help="Switch tab order"):
 
 tabs_creadas = st.tabs(orden_tabs_guardado)
 mapa_tabs = dict(zip(orden_tabs_guardado, tabs_creadas))
+pestana0 = mapa_tabs["🎛️ DASHBOARD"]
 pestana1 = mapa_tabs["📊 COSTS & INCOME"]
 pestana2 = mapa_tabs["💼 TOTAL NET WORTH"]
 pestana3 = mapa_tabs["⚡ LIVE CASH FLOW"]
+
+# =========================================================================
+# ============================= TAB 0: DASHBOARD ==========================
+# =========================================================================
+with pestana0:
+    st.markdown(
+        "<div style='background:#0E1116; border:1.5px solid #262E3B; border-radius:20px; padding:16px 18px 10px 18px; margin-bottom:10px;'>"
+        "<div style='color:#94A3B8; font-size:0.78rem; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; text-align:center;'>"
+        "FINAPP INSTRUMENT CLUSTER · LIVE AUD GAUGES"
+        "</div></div>",
+        unsafe_allow_html=True,
+    )
+
+    dash_balances = _obtener_balances_dashboard(datos, usd_to_aud, cotizaciones)
+    cfg_guardada = datos.setdefault("dashboard_gauges", {})
+
+    # 3x2 grid on desktop (auto-stacks cleanly on mobile)
+    for row_start in (0, 3):
+        cols_dash = st.columns(3, gap="medium")
+        for col_i in range(3):
+            g_idx = row_start + col_i
+            base_cfg = DASHBOARD_DEFAULT_GAUGES[g_idx]
+            g_id = base_cfg["id"]
+            g_cfg = cfg_guardada.setdefault(g_id, dict(base_cfg))
+            for k_def, v_def in base_cfg.items():
+                g_cfg.setdefault(k_def, v_def)
+
+            val_actual = dash_balances.get(g_id, 0.0)
+            sup_extra = dash_balances.get("super", 0.0) if g_cfg.get("is_investments") else None
+
+            with cols_dash[col_i]:
+                components.html(
+                    _html_gauge_cluster_card(g_cfg, val_actual, idx=g_idx, super_aud=sup_extra),
+                    height=268 if g_cfg.get("is_investments") else 246,
+                )
+                with st.popover("⚙️", help=f"Configure {g_cfg['name']} gauge"):
+                    cur_max = int(g_cfg.get("max", base_cfg["max"]))
+                    new_max = st.number_input(
+                        "Max value (AUD)",
+                        min_value=100,
+                        max_value=5000000,
+                        value=cur_max,
+                        step=500,
+                        key=f"dash_max_{g_id}",
+                    )
+                    cur_o1 = max(0, min(int(g_cfg.get("opt_start", base_cfg["opt_start"])), int(new_max)))
+                    cur_o2 = max(cur_o1, min(int(g_cfg.get("opt_end", base_cfg["opt_end"])), int(new_max)))
+                    lbl_rng = "OK / NICE range (AUD)" if g_cfg.get("is_investments") else "Optimal range (AUD)"
+                    new_o1, new_o2 = st.slider(
+                        lbl_rng,
+                        min_value=0,
+                        max_value=int(new_max),
+                        value=(cur_o1, cur_o2),
+                        step=50 if int(new_max) <= 5000 else 100,
+                        key=f"dash_rng_{g_id}",
+                    )
+                    if new_max != cur_max or new_o1 != cur_o1 or new_o2 != cur_o2:
+                        g_cfg["max"] = int(new_max)
+                        g_cfg["opt_start"] = int(new_o1)
+                        g_cfg["opt_end"] = int(new_o2)
+                        guardar_datos(datos, registrar_cambio=False)
+                        st.rerun()
+
 
 # =========================================================================
 # ============================= TAB 1 =====================================
