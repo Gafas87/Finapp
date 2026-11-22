@@ -636,11 +636,12 @@ def obtener_transacciones_up_bank(token, days_back=30, refresh_nonce=0, max_page
         return [], f"Connection error: {e}"
 
 
-def clasificar_transaccion_up(tx, own_account_ids=None):
+def clasificar_transaccion_up(tx, own_account_ids=None, own_account_names=None):
     attrs = tx.get("attributes", {})
     rels = tx.get("relationships", {})
     desc = (attrs.get("description") or "").strip()
     msg = (attrs.get("message") or "").strip()
+    tx_type = (attrs.get("transactionType") or "").strip().lower()
 
     amt_obj = attrs.get("amount", {})
     amount_aud = float(amt_obj.get("value", 0.0))
@@ -651,17 +652,24 @@ def clasificar_transaccion_up(tx, own_account_ids=None):
     except Exception:
         dt_syd = datetime.now(TZ_SYDNEY)
 
-    # Verify internal transfer ownership via Up API relationships.transferAccount
+    # Verify internal transfer ownership via Up API relationships.transferAccount, transactionType, or own account names
     transfer_data = (rels.get("transferAccount") or {}).get("data")
     needs_review = False
     is_internal_up = False
-    if isinstance(transfer_data, dict) and transfer_data.get("id"):
+    desc_low = desc.lower()
+
+    if tx_type in ("transfer", "internal transfer"):
+        is_internal_up = True
+    elif isinstance(transfer_data, dict) and transfer_data.get("id"):
         target_id = transfer_data.get("id")
         if own_account_ids is None or target_id in own_account_ids:
             is_internal_up = True
         else:
-            # Counterparty account ID is not confirmed among own Up accounts -> flag for review, do NOT auto-exclude
             needs_review = True
+    elif own_account_names and (desc_low.startswith("transfer from ") or desc_low.startswith("transfer to ")):
+        counterparty = desc_low.replace("transfer from ", "", 1).replace("transfer to ", "", 1).strip()
+        if any(counterparty == nm or nm in counterparty for nm in own_account_names if nm):
+            is_internal_up = True
 
     up_cat = (rels.get("category", {}).get("data") or {}).get("id") or ""
 
@@ -691,18 +699,28 @@ def clasificar_transaccion_up(tx, own_account_ids=None):
 
 
 PALETA_PASTEL = [
-    "#9B89B3",  # Pastel plum lilac
-    "#F6A682",  # Pastel peach coral
-    "#76C893",  # Pastel mint green
-    "#72B0E8",  # Pastel sky blue
-    "#F4D06F",  # Pastel warm yellow
-    "#E58F9E",  # Pastel dusty rose
-    "#64C2C7",  # Pastel turquoise
-    "#C3A6A0",  # Pastel taupe
-    "#A3C9A8",  # Pastel sage green
-    "#D99B66",  # Soft terracotta
-    "#8E9AAF",  # Pastel slate blue
-    "#E2AFCF"   # Pastel orchid
+    "#16A34A",
+    "#DC2626",
+    "#0284C7",
+    "#CA8A04",
+    "#7C3AED",
+    "#EA580C",
+    "#0D9488",
+    "#B91C1C",
+    "#15803D",
+    "#4F46E5",
+    "#D97706",
+    "#0369A1"
+]
+
+PALETA_COSTOS = [
+    "#DC2626", "#EA580C", "#991B1B", "#D97706", "#B91C1C",
+    "#C2410C", "#E11D48", "#B45309", "#7F1D1D", "#F97316"
+]
+
+PALETA_INGRESOS = [
+    "#16A34A", "#15803D", "#059669", "#166534", "#0D9488",
+    "#22C55E", "#14532D", "#047857"
 ]
 
 ICONOS_DISPONIBLES = [
@@ -1426,13 +1444,14 @@ def formatear_etiqueta_torta(texto, usar_minusculas=False):
     return t
 
 
-def crear_torta_2d(df, col_valores, col_nombres, tamano="mediano", usar_minusculas=False):
+def crear_torta_2d(df, col_valores, col_nombres, tamano="mediano", usar_minusculas=False, paleta=None):
     valores = df[col_valores].tolist()
     nombres = [formatear_etiqueta_torta(nom, usar_minusculas=usar_minusculas) for nom in df[col_nombres].tolist()]
     total = sum(valores) if sum(valores) > 0 else 1.0
     n = len(valores)
 
-    colores = [PALETA_PASTEL[i % len(PALETA_PASTEL)] for i in range(n)]
+    _pal_usar = paleta if paleta else PALETA_PASTEL
+    colores = [_pal_usar[i % len(_pal_usar)] for i in range(n)]
 
     textos_torta = [
         f"{nom}<br>{((v / total) * 100):.1f}%"
@@ -1503,7 +1522,7 @@ def crear_torta_2d(df, col_valores, col_nombres, tamano="mediano", usar_minuscul
 
 
 # ----------------- CLEAN HORIZONTAL BAR CHART (AUD) -----------------
-def crear_barras_horizontales(df, col_valores, col_nombres):
+def crear_barras_horizontales(df, col_valores, col_nombres, color_barra=None):
     df_ord = df.sort_values(by=col_valores, ascending=True).copy()
     valores = df_ord[col_valores].tolist()
     nombres = df_ord[col_nombres].tolist()
@@ -1511,15 +1530,10 @@ def crear_barras_horizontales(df, col_valores, col_nombres):
     max_val = max(valores) if valores else 1.0
     n = len(valores)
 
-    colores = []
-    for idx_b, v in enumerate(valores):
-        ratio = (idx_b + 1) / max(n, 1)
-        if ratio > 0.66:
-            colores.append("#F5B7B1")
-        elif ratio > 0.33:
-            colores.append("#F9E79F")
-        else:
-            colores.append("#ABEBC6")
+    if color_barra:
+        colores = [color_barra for _ in valores]
+    else:
+        colores = ["#DC2626" if (idx_b + 1) / max(n, 1) > 0.5 else "#16A34A" for idx_b, _ in enumerate(valores)]
 
     textos = [f"  ${v:,.0f} AUD ({(v / total) * 100:.1f}%)" for v in valores]
 
@@ -2588,17 +2602,17 @@ st.markdown("""
     }
     div[data-testid="stElementContainer"]:has(> div > .hook-agregar-costo) + div[data-testid="stElementContainer"] details,
     details[data-add-cat="costo"] {
-        background-color: #FFF2EE !important;
-        border: 2px solid #E07A5F !important;
+        background-color: #FEF2F2 !important;
+        border: 2px solid #DC2626 !important;
         border-radius: 16px !important;
-        box-shadow: 0 4px 12px rgba(224, 122, 95, 0.14) !important;
+        box-shadow: 0 4px 12px rgba(220, 38, 38, 0.10) !important;
         margin-bottom: 12px !important;
         overflow: hidden !important;
     }
     div[data-testid="stElementContainer"]:has(> div > .hook-agregar-costo) + div[data-testid="stElementContainer"] details > summary,
     details[data-add-cat="costo"] > summary {
-        background-color: #FADBD8 !important;
-        color: #922B21 !important;
+        background-color: #FEE2E2 !important;
+        color: #991B1B !important;
         font-weight: 800 !important;
         padding: 12px 16px !important;
         border-radius: 14px !important;
@@ -2606,7 +2620,7 @@ st.markdown("""
     }
     div[data-testid="stElementContainer"]:has(> div > .hook-agregar-costo) + div[data-testid="stElementContainer"] details > summary:hover,
     details[data-add-cat="costo"] > summary:hover {
-        background-color: #F5B7B1 !important;
+        background-color: #FECACA !important;
     }
     div[data-testid="stElementContainer"]:has(> div > .hook-agregar-costo) + div[data-testid="stElementContainer"] details > summary p,
     div[data-testid="stElementContainer"]:has(> div > .hook-agregar-costo) + div[data-testid="stElementContainer"] details > summary span,
@@ -2614,24 +2628,24 @@ st.markdown("""
     details[data-add-cat="costo"] > summary p,
     details[data-add-cat="costo"] > summary span,
     details[data-add-cat="costo"] > summary svg {
-        color: #922B21 !important;
-        fill: #922B21 !important;
+        color: #991B1B !important;
+        fill: #991B1B !important;
         font-weight: 800 !important;
     }
 
     div[data-testid="stElementContainer"]:has(> div > .hook-agregar-ingreso) + div[data-testid="stElementContainer"] details,
     details[data-add-cat="ingreso"] {
-        background-color: #ECFDF5 !important;
-        border: 2px solid #48C9B0 !important;
+        background-color: #F0FDF4 !important;
+        border: 2px solid #16A34A !important;
         border-radius: 16px !important;
-        box-shadow: 0 4px 12px rgba(72, 201, 176, 0.14) !important;
+        box-shadow: 0 4px 12px rgba(22, 163, 74, 0.10) !important;
         margin-bottom: 12px !important;
         overflow: hidden !important;
     }
     div[data-testid="stElementContainer"]:has(> div > .hook-agregar-ingreso) + div[data-testid="stElementContainer"] details > summary,
     details[data-add-cat="ingreso"] > summary {
-        background-color: #D1F2EB !important;
-        color: #0E6251 !important;
+        background-color: #DCFCE7 !important;
+        color: #166534 !important;
         font-weight: 800 !important;
         padding: 12px 16px !important;
         border-radius: 14px !important;
@@ -2639,7 +2653,7 @@ st.markdown("""
     }
     div[data-testid="stElementContainer"]:has(> div > .hook-agregar-ingreso) + div[data-testid="stElementContainer"] details > summary:hover,
     details[data-add-cat="ingreso"] > summary:hover {
-        background-color: #A3E4D7 !important;
+        background-color: #BBF7D0 !important;
     }
     div[data-testid="stElementContainer"]:has(> div > .hook-agregar-ingreso) + div[data-testid="stElementContainer"] details > summary p,
     div[data-testid="stElementContainer"]:has(> div > .hook-agregar-ingreso) + div[data-testid="stElementContainer"] details > summary span,
@@ -2647,8 +2661,8 @@ st.markdown("""
     details[data-add-cat="ingreso"] > summary p,
     details[data-add-cat="ingreso"] > summary span,
     details[data-add-cat="ingreso"] > summary svg {
-        color: #0E6251 !important;
-        fill: #0E6251 !important;
+        color: #166534 !important;
+        fill: #166534 !important;
         font-weight: 800 !important;
     }
 
@@ -2721,40 +2735,51 @@ st.markdown("""
         margin-bottom: 1rem;
         box-shadow: 0 2px 6px rgba(0,0,0,0.04);
     }
-    .metric-card-costo {
-        background-color: #FDEBD0;
-        border: 1px solid #F5CBA7;
-        border-left: 7px solid #E59866;
-        color: #6E2C00;
+    .metric-card-costo, .metric-card-costos, .metric-card-rojo-pastel {
+        background-color: #FEF2F2;
+        border: 1px solid #FECACA;
+        border-left: 7px solid #DC2626;
+        color: #991B1B;
     }
-    .metric-card-ingreso {
-        background-color: #E8F8F5;
-        border: 1px solid #A3E4D7;
-        border-left: 7px solid #76D7C4;
-        color: #117864;
+    .metric-card-ingreso, .metric-card-ingresos {
+        background-color: #F0FDF4;
+        border: 1px solid #BBF7D0;
+        border-left: 7px solid #16A34A;
+        color: #166534;
+    }
+    .metric-card-amarillo-mate {
+        background-color: #FEF9E7;
+        border: 1px solid #E5C76B;
+        border-left: 7px solid #C9A227;
+        color: #7C5E10;
     }
     .metric-card-lila {
-        background-color: #F3E8FF;
-        border: 1px solid #D8B4FE;
-        border-left: 7px solid #B794F4;
-        color: #4A235A;
-    }
-    .metric-card-rojo-pastel {
-        background-color: #FADBD8;
-        border: 1px solid #F5B7B1;
-        border-left: 7px solid #EC7063;
-        color: #78281F;
+        background-color: #F0FDF4;
+        border: 1px solid #BBF7D0;
+        border-left: 7px solid #16A34A;
+        color: #166534;
     }
     .metric-card-neutro {
-        background-color: #F3F4F6;
-        border: 1px solid #D1D5DB;
-        border-left: 7px solid #9CA3AF;
-        color: #374151;
+        background-color: #FEF9E7;
+        border: 1px solid #E5C76B;
+        border-left: 7px solid #C9A227;
+        color: #7C5E10;
     }
     .kpi-title {
         font-size: 1.15rem;
         font-weight: 700;
+        color: #111827 !important;
         margin-bottom: 0.3rem;
+    }
+    [data-testid="stSidebar"] * {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+    }
+    [data-testid="stSidebar"] p,
+    [data-testid="stSidebar"] label,
+    [data-testid="stSidebar"] summary {
+        font-size: 0.90rem !important;
+        font-weight: 600 !important;
+        color: #111827 !important;
     }
     .kpi-value {
         font-size: 2.1rem;
@@ -3183,14 +3208,14 @@ def finalizar_sesion():
 
 
 with st.sidebar:
-    st.markdown(_html_piggy_mascot(96), unsafe_allow_html=True)
-    _d_num = ahora.day
-    _suf = "th" if 11 <= (_d_num % 100) <= 13 else {1: "st", 2: "nd", 3: "rd"}.get(_d_num % 10, "th")
-    st.markdown(f"<div style='text-align:center; font-weight:700; font-size:1.05rem; margin-bottom:6px;'>{ahora.strftime('%B')} {_d_num}{_suf}</div>", unsafe_allow_html=True)
     gcal_url = _obtener_gcal_url()
     if gcal_url:
-        eventos_cal, err_cal = obtener_eventos_gcal(gcal_url, days_ahead=30)
-        st.markdown("**📅 Coming Payments**")
+        eventos_cal_raw, err_cal = obtener_eventos_gcal(gcal_url, days_ahead=30)
+        eventos_cal = [
+            ev for ev in (eventos_cal_raw or [])
+            if "update finapp costs" not in str(ev.get("title", "")).lower()
+        ]
+        st.markdown("<div style='font-size:0.95rem; font-weight:700; color:#111827; margin-bottom:8px;'>📅 Coming Payments</div>", unsafe_allow_html=True)
         if err_cal:
             st.caption(f"⚠️ {err_cal}")
         elif not eventos_cal:
@@ -3200,15 +3225,15 @@ with st.sidebar:
                 amt = ev["amount_aud"]
                 if amt is not None:
                     amt_str = f"+${amt:,.0f}" if amt > 0 else f"-${abs(amt):,.0f}"
-                    color_ev = "#0F766E" if amt > 0 else "#B45309"
+                    color_ev = "#166534" if amt > 0 else "#991B1B"
                     badge = f"<span style='color:{color_ev}; font-weight:700;'>{amt_str}</span>"
                 else:
                     badge = ""
                 st.markdown(
                     f"<div style='background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; "
-                    f"padding:6px 9px; margin-bottom:5px; font-size:0.83rem; line-height:1.3;'>"
-                    f"<b>{ev['title']}</b> {badge}<br>"
-                    f"<span style='color:#64748B;'>{ev['date_str']} · {ev['when']}</span></div>",
+                    f"padding:7px 10px; margin-bottom:6px; font-size:0.84rem; line-height:1.35;'>"
+                    f"<span style='font-weight:600; color:#111827;'>{ev['title']}</span> {badge}<br>"
+                    f"<span style='color:#64748B; font-weight:400;'>{ev['date_str']} · {ev['when']}</span></div>",
                     unsafe_allow_html=True,
                 )
             if len(eventos_cal) > 5:
@@ -3216,7 +3241,7 @@ with st.sidebar:
                     for ev in eventos_cal[5:15]:
                         amt = ev["amount_aud"]
                         amt_txt = (f" (+${amt:,.0f})" if amt > 0 else f" (-${abs(amt):,.0f})") if amt is not None else ""
-                        st.caption(f"• **{ev['date_str']}**: {ev['title']}{amt_txt}")
+                        st.caption(f"• {ev['date_str']}: {ev['title']}{amt_txt}")
     st.markdown("---")
 
     REMINDER_OPTIONS = [
@@ -3866,8 +3891,16 @@ pestana3 = mapa_tabs["⚡ LIVE CASH FLOW"]
 # ============================= TAB 0: DASHBOARD ==========================
 # =========================================================================
 with pestana0:
-
     dash_balances = _obtener_balances_dashboard(datos, usd_to_aud, cotizaciones)
+    tnw_total_aud = sum(
+        float(dash_balances.get(k, 0.0) or 0.0)
+        for k in ["essentials", "treat_yourself", "trips_goals", "fire_extinguisher", "emergency", "investments", "super"]
+    )
+    st.markdown(
+        f"<div style='text-align:center; font-size:1.35rem; font-weight:800; color:#111827; "
+        f"letter-spacing:0.04em; margin-bottom:12px;'>TNW = ${int(round(tnw_total_aud)):,} AUD</div>",
+        unsafe_allow_html=True,
+    )
     cfg_guardada = datos.setdefault("dashboard_gauges", {})
 
     # 3x2 grid on desktop (auto-stacks cleanly on mobile)
@@ -3948,23 +3981,23 @@ with pestana1:
     saldo_neto = total_ingresos - total_costos
 
     if saldo_neto > 0:
-        clase_saldo = "metric-card-lila"
+        clase_saldo = "metric-card-ingreso"
         carita = "😊"
         sub_saldo = "Positive result (Gain / Savings)"
-    elif saldo_neto == 0:
-        clase_saldo = "metric-card-neutro"
+    elif saldo_neto == 0 or (total_ingresos > 0 and abs(saldo_neto) < 0.10 * total_ingresos):
+        clase_saldo = "metric-card-amarillo-mate"
         carita = "😐"
-        sub_saldo = "Break-even (No gain or loss)"
+        sub_saldo = "Break-even (No gain or loss)" if saldo_neto == 0 else "Mild weekly deficit (< 10% of income)"
     else:
-        clase_saldo = "metric-card-rojo-pastel"
+        clase_saldo = "metric-card-costo"
         carita = "😟"
-        sub_saldo = "Negative result (Monthly deficit)"
+        sub_saldo = "Negative result (Weekly deficit ≥ 10%)"
 
     col_kpi1, col_kpi2, col_kpi3 = st.columns(3, gap="medium")
     with col_kpi1:
         st.markdown(f"""
         <div class="metric-card metric-card-costo">
-            <div class="kpi-title">Monthly Costs</div>
+            <div class="kpi-title">Weekly Costs</div>
             <div class="kpi-value">${total_costos:,.0f} AUD</div>
             <div class="kpi-sub">{len(costos_activos)} active of {total_items_costos}</div>
         </div>
@@ -3973,7 +4006,7 @@ with pestana1:
     with col_kpi2:
         st.markdown(f"""
         <div class="metric-card metric-card-ingreso">
-            <div class="kpi-title">Monthly Income</div>
+            <div class="kpi-title">Weekly Income</div>
             <div class="kpi-value">${total_ingresos:,.0f} AUD</div>
             <div class="kpi-sub">{len(ingresos_activos)} active of {total_items_ingresos}</div>
         </div>
@@ -3982,7 +4015,7 @@ with pestana1:
     with col_kpi3:
         st.markdown(f"""
         <div class="metric-card {clase_saldo}">
-            <div class="kpi-title">Monthly Savings {carita}</div>
+            <div class="kpi-title">Weekly Savings {carita}</div>
             <div class="kpi-value">${saldo_neto:,.0f} AUD</div>
             <div class="kpi-sub">{sub_saldo}</div>
         </div>
@@ -3994,7 +4027,7 @@ with pestana1:
 
     # ---------------- COSTS ----------------
     with col_izq:
-        st.markdown("<h3 style='color: #A04000; margin-bottom: 6px;'>📉 My Monthly Costs</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='color: #111827; margin-bottom: 6px;'>📉 My Weekly Costs</h3>", unsafe_allow_html=True)
         st.markdown("<div class='hook-agregar-costo' style='display:none;'></div>", unsafe_allow_html=True)
 
         with st.expander("➕ ADD NEW COST CATEGORY"):
@@ -4169,7 +4202,7 @@ with pestana1:
 
     # ---------------- INCOME ----------------
     with col_der:
-        st.markdown("<h3 style='color: #117864; margin-bottom: 6px;'>📈 My Monthly Income</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='color: #111827; margin-bottom: 6px;'>📈 My Weekly Income</h3>", unsafe_allow_html=True)
         st.markdown("<div class='hook-agregar-ingreso' style='display:none;'></div>", unsafe_allow_html=True)
 
         with st.expander("➕ ADD NEW INCOME CATEGORY"):
@@ -4345,7 +4378,7 @@ with pestana1:
     st.markdown("---")
 
     st.markdown(
-        "<h3 style='color: #5B4B8A;'>📊 Charts & Tables</h3>",
+        "<h3 style='color: #111827;'>📊 Charts & Tables</h3>",
         unsafe_allow_html=True
     )
     modo_grafico = st.radio(
@@ -4360,7 +4393,7 @@ with pestana1:
 
     with col_chart_c:
         st.markdown(
-            "<h4 style='color: #A04000; text-align: center;'>Costs Breakdown</h4>",
+            "<h4 style='color: #111827; text-align: center;'>Costs Breakdown</h4>",
             unsafe_allow_html=True
         )
         if costos_activos and total_costos > 0:
@@ -4369,13 +4402,13 @@ with pestana1:
                 df_pie_c = df_c_raw.groupby("grupo", as_index=False)["monto"].sum().sort_values(by="monto", ascending=False)
                 col_label_c = "grupo"
                 titulo_col_c = "Category"
-                fig_c = crear_torta_2d(df_pie_c, "monto", col_label_c, tamano="grande", usar_minusculas=True)
+                fig_c = crear_torta_2d(df_pie_c, "monto", col_label_c, tamano="grande", usar_minusculas=True, paleta=PALETA_COSTOS)
             else:
                 df_pie_c = df_c_raw.sort_values(by="monto", ascending=False).copy()
                 df_pie_c["etiqueta"] = df_pie_c["categoria"]
                 col_label_c = "etiqueta"
                 titulo_col_c = "Subcategory"
-                fig_c = crear_barras_horizontales(df_pie_c, "monto", col_label_c)
+                fig_c = crear_barras_horizontales(df_pie_c, "monto", col_label_c, color_barra="#DC2626")
 
             df_pie_c["Percentage"] = (df_pie_c["monto"] / total_costos) * 100
 
@@ -4391,7 +4424,7 @@ with pestana1:
 
     with col_chart_i:
         st.markdown(
-            "<h4 style='color: #117864; text-align: center;'>Income Breakdown</h4>",
+            "<h4 style='color: #111827; text-align: center;'>Income Breakdown</h4>",
             unsafe_allow_html=True
         )
         if ingresos_activos and total_ingresos > 0:
@@ -4400,13 +4433,13 @@ with pestana1:
                 df_pie_i = df_i_raw.groupby("grupo", as_index=False)["monto"].sum().sort_values(by="monto", ascending=False)
                 col_label_i = "grupo"
                 titulo_col_i = "Category"
-                fig_i = crear_torta_2d(df_pie_i, "monto", col_label_i, tamano="chico", usar_minusculas=True)
+                fig_i = crear_torta_2d(df_pie_i, "monto", col_label_i, tamano="chico", usar_minusculas=True, paleta=PALETA_INGRESOS)
             else:
                 df_pie_i = df_i_raw.sort_values(by="monto", ascending=False).copy()
                 df_pie_i["etiqueta"] = df_pie_i["concepto"]
                 col_label_i = "etiqueta"
                 titulo_col_i = "Subcategory"
-                fig_i = crear_barras_horizontales(df_pie_i, "monto", col_label_i)
+                fig_i = crear_barras_horizontales(df_pie_i, "monto", col_label_i, color_barra="#16A34A")
 
             df_pie_i["Percentage"] = (df_pie_i["monto"] / total_ingresos) * 100
 
@@ -5195,40 +5228,20 @@ with pestana3:
                 else:
                     st.warning("Paste your `up:yeah:...` token first.")
     else:
-        PERIOD_OPTIONS = [
-            (7, "Last week"),
-            (30, "Last month"),
-            (90, "Last quarter"),
-            (180, "Last 6 months"),
-            (365, "Last year"),
-            (None, "All time"),
-        ]
         if "up_hide_internal" not in st.session_state:
             st.session_state["up_hide_internal"] = True
 
-        c_ctrl1, c_ctrl2, c_ctrl_sp = st.columns([2.2, 2.8, 4.0])
-        with c_ctrl1:
-            periodo_sel = st.selectbox(
-                "📅 Period",
-                options=PERIOD_OPTIONS,
-                index=1,
-                format_func=lambda p: p[1],
-                key="up_days_window",
-            )
-            dias_ventana, etiqueta_periodo = periodo_sel
-        with c_ctrl2:
-            st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
-            ocultar_internas_up = st.checkbox(
-                "Exclude internal Up transfers",
-                help="Excludes transfers between your own Up Bank accounts so every external dollar in or out is counted accurately.",
-                key="up_hide_internal",
-            )
+        ocultar_internas_up = st.checkbox(
+            "Exclude internal Up transfers",
+            help="Excludes transfers between your own Up Bank accounts so every external dollar in or out is counted accurately.",
+            key="up_hide_internal",
+        )
 
         cuentas_up, err_cuentas = obtener_cuentas_up_bank(
             up_token_activo, st.session_state["up_refresh_nonce"]
         )
         txs_raw, err_txs = obtener_transacciones_up_bank(
-            up_token_activo, dias_ventana, st.session_state["up_refresh_nonce"]
+            up_token_activo, 90, st.session_state["up_refresh_nonce"]
         )
 
         if err_cuentas or err_txs:
@@ -5237,20 +5250,14 @@ with pestana3:
                 st.session_state["up_temp_token"] = ""
                 st.rerun()
         else:
-            # 1. Live Up Account Balances
-            if cuentas_up:
-                total_up_aud = sum(c["balance_aud"] for c in cuentas_up)
-                cols_acc = st.columns(min(len(cuentas_up) + 1, 5))
-                cols_acc[0].metric("🏦 Total Up Balance", f"${total_up_aud:,.2f} AUD")
-                for idx_acc, acc in enumerate(cuentas_up[:4]):
-                    cols_acc[idx_acc + 1].metric(acc["name"], f"${acc['balance_aud']:,.2f} AUD")
-
             own_up_ids = {c["id"] for c in (cuentas_up or []) if c.get("id")} if cuentas_up else None
-            filas_tx = [clasificar_transaccion_up(tx, own_up_ids) for tx in txs_raw]
+            own_up_names = {str(c.get("name", "")).strip().lower() for c in (cuentas_up or []) if c.get("name")} if cuentas_up else set()
+            own_up_names.update({"spending", "2up spending", "fire extinguisher", "trips & goals", "emergency", "essentials", "treat yourself"})
+            filas_tx = [clasificar_transaccion_up(tx, own_up_ids, own_up_names) for tx in txs_raw]
             df_up = pd.DataFrame(filas_tx)
 
             if df_up.empty:
-                st.info(f"No Up Bank transactions found for: {etiqueta_periodo}.")
+                st.info("No Up Bank transactions found.")
             else:
                 df_filtrado = df_up.copy()
                 if ocultar_internas_up:
@@ -5261,53 +5268,8 @@ with pestana3:
                     st.info(
                         f"⚠️ {n_review} transfer(s) could not be confirmed as your own Up Bank account and were kept in Cash Flow for your review."
                     )
-                incomes_aud = df_filtrado[df_filtrado["Amount (AUD)"] > 0]["Amount (AUD)"].sum()
-                expenses_aud = abs(df_filtrado[df_filtrado["Amount (AUD)"] < 0]["Amount (AUD)"].sum())
-                net_aud = incomes_aud - expenses_aud
 
-                k1, k2, k3 = st.columns(3)
-                k1.markdown(
-                    f'<div class="metric-card metric-card-ingresos"><h4>Live Income ({etiqueta_periodo})</h4>'
-                    f'<div class="valor-principal">${incomes_aud:,.2f} AUD</div>'
-                    f'<div class="subtexto">All external incoming funds</div></div>',
-                    unsafe_allow_html=True,
-                )
-                k2.markdown(
-                    f'<div class="metric-card metric-card-costos"><h4>Live Expenses ({etiqueta_periodo})</h4>'
-                    f'<div class="valor-principal">${expenses_aud:,.2f} AUD</div>'
-                    f'<div class="subtexto">All external outgoing payments</div></div>',
-                    unsafe_allow_html=True,
-                )
-                clase_net = "metric-card-lila" if net_aud >= 0 else "metric-card-neutro"
-                k3.markdown(
-                    f'<div class="metric-card {clase_net}"><h4>Net Cash Flow ({etiqueta_periodo})</h4>'
-                    f'<div class="valor-principal">${net_aud:,.2f} AUD</div>'
-                    f'<div class="subtexto">Filtered live balance</div></div>',
-                    unsafe_allow_html=True,
-                )
-
-                st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
-
-                # Breakdown Charts
-                c_ch1, c_ch2 = st.columns(2)
-                with c_ch1:
-                    df_in = df_filtrado[df_filtrado["Amount (AUD)"] > 0]
-                    if not df_in.empty:
-                        grp_in = df_in.groupby("Tag", as_index=False)["Amount (AUD)"].sum()
-                        fig_in = crear_torta_2d(grp_in, "Amount (AUD)", "Tag")
-                        st.markdown("**💵 Income by Source**")
-                        st.plotly_chart(fig_in, use_container_width=True, config={"displayModeBar": False})
-                with c_ch2:
-                    df_out = df_filtrado[df_filtrado["Amount (AUD)"] < 0].copy()
-                    if not df_out.empty:
-                        df_out["Spent (AUD)"] = df_out["Amount (AUD)"].abs()
-                        grp_out = df_out.groupby("Tag", as_index=False)["Spent (AUD)"].sum()
-                        fig_out = crear_torta_2d(grp_out, "Spent (AUD)", "Tag")
-                        st.markdown("**💳 Expenses by Category**")
-                        st.plotly_chart(fig_out, use_container_width=True, config={"displayModeBar": False})
-
-                # Searchable Transaction Table
-                f_txt = st.text_input("🔎 Search transactions (e.g. ME Group, Coles, Woolworths):", key="up_search_tx")
+                f_txt = st.text_input("🔎 Search transactions", key="up_search_tx")
                 df_show = df_filtrado.copy()
                 if f_txt.strip():
                     q_low = f_txt.strip().lower()
@@ -5323,6 +5285,7 @@ with pestana3:
                     lambda x: f"+${x:,.2f} AUD" if x >= 0 else f"-${abs(x):,.2f} AUD"
                 )
                 st.dataframe(tabla_up, use_container_width=True, hide_index=True)
+
 
 # =========================================================================
 # ==================== FLOATING BOTTOM-RIGHT CHATBOT ======================
