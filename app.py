@@ -2790,6 +2790,46 @@ st.markdown("""
         font-weight: 600 !important;
         color: #111827 !important;
     }
+    [data-testid="stSidebar"] details > summary {
+        white-space: nowrap !important;
+        overflow: hidden !important;
+    }
+    [data-testid="stSidebar"] details > summary p {
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        margin: 0 !important;
+    }
+    div[data-testid="stElementContainer"]:has(> div > .hook-gauge-gear),
+    div[data-testid="stElementContainer"]:has(> div > .hook-gauge-gear-inv) {
+        display: none !important;
+    }
+    div[data-testid="stElementContainer"]:has(> div > .hook-gauge-gear) + div[data-testid="stElementContainer"] {
+        margin-top: -54px !important;
+        margin-bottom: 12px !important;
+        padding-left: calc(50% - 114px) !important;
+        position: relative !important;
+        z-index: 10 !important;
+    }
+    div[data-testid="stElementContainer"]:has(> div > .hook-gauge-gear-inv) + div[data-testid="stElementContainer"] {
+        margin-top: -76px !important;
+        margin-bottom: 16px !important;
+        padding-left: calc(50% - 114px) !important;
+        position: relative !important;
+        z-index: 10 !important;
+    }
+    div[data-testid="stElementContainer"]:has(> div > .hook-gauge-gear) + div[data-testid="stElementContainer"] [data-testid="stPopover"] button,
+    div[data-testid="stElementContainer"]:has(> div > .hook-gauge-gear-inv) + div[data-testid="stElementContainer"] [data-testid="stPopover"] button {
+        height: 34px !important;
+        min-height: 34px !important;
+        width: 34px !important;
+        min-width: 34px !important;
+        padding: 0 !important;
+        border-radius: 9px !important;
+        background: #F8FAFC !important;
+        border: 1.5px solid #CBD5E1 !important;
+        box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08) !important;
+    }
     .kpi-value {
         font-size: 2.1rem;
         font-weight: 800;
@@ -3300,7 +3340,7 @@ with st.sidebar:
             st.session_state.pop(k_reset, None)
         st.rerun()
 
-    with st.expander("🔐 Recovery Settings"):
+    with st.expander("🔐 Recovery Pswrd"):
         seg_actual = datos.get("seguridad", {})
         em_conf = st.text_input(
             "Recovery Email:",
@@ -3724,6 +3764,7 @@ def _html_gauge_cluster_card(cfg, val_aud, idx=0, super_aud=None):
     padding: 4px 9px;
     box-shadow: inset 0 2px 5px rgba(0,0,0,0.85), 0 3px 10px rgba(15,23,42,0.10);
     margin-top: -6px;
+    margin-left: 38px;
   }}
   .odo-cell {{
     display: inline-flex;
@@ -3766,7 +3807,6 @@ def _html_gauge_cluster_card(cfg, val_aud, idx=0, super_aud=None):
   <div class="cluster-card" id="{uid}_card">
     <div class="gauge-head">
       <span class="gauge-title">{cfg['name']}</span>
-      <span class="status-chip">{estado}</span>
     </div>
     <svg viewBox="0 0 300 158">
       <defs>
@@ -3900,15 +3940,6 @@ pestana3 = mapa_tabs["⚡ LIVE CASH FLOW"]
 # =========================================================================
 with pestana0:
     dash_balances = _obtener_balances_dashboard(datos, usd_to_aud, cotizaciones)
-    tnw_total_aud = sum(
-        float(dash_balances.get(k, 0.0) or 0.0)
-        for k in ["essentials", "treat_yourself", "trips_goals", "fire_extinguisher", "emergency", "investments", "super"]
-    )
-    st.markdown(
-        f"<div style='text-align:center; font-size:1.35rem; font-weight:800; color:#111827; "
-        f"letter-spacing:0.04em; margin-bottom:12px;'>TNW = ${int(round(tnw_total_aud)):,} AUD</div>",
-        unsafe_allow_html=True,
-    )
     cfg_guardada = datos.setdefault("dashboard_gauges", {})
 
     # 3x2 grid on desktop (auto-stacks cleanly on mobile)
@@ -3930,6 +3961,8 @@ with pestana0:
                     _html_gauge_cluster_card(g_cfg, val_actual, idx=g_idx, super_aud=sup_extra),
                     height=268 if g_cfg.get("is_investments") else 246,
                 )
+                hook_cls = "hook-gauge-gear-inv" if g_cfg.get("is_investments") else "hook-gauge-gear"
+                st.markdown(f"<div class='{hook_cls}' style='display:none;'></div>", unsafe_allow_html=True)
                 with st.popover("⚙️", help=f"Configure {g_cfg['name']} gauge"):
                     cur_max = int(g_cfg.get("max", base_cfg["max"]))
                     new_max = st.number_input(
@@ -3957,6 +3990,29 @@ with pestana0:
                         g_cfg["opt_end"] = int(new_o2)
                         guardar_datos(datos, registrar_cambio=False)
                         st.rerun()
+
+
+    tnw_total_aud = sum(
+        float(dash_balances.get(k, 0.0) or 0.0)
+        for k in ["essentials", "treat_yourself", "trips_goals", "fire_extinguisher", "emergency", "investments", "super"]
+    )
+    if "dash_tnw_visible" not in st.session_state:
+        st.session_state["dash_tnw_visible"] = True
+
+    st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+    c_tnw_sp1, c_tnw_txt, c_tnw_eye, c_tnw_sp2 = st.columns([3.0, 2.8, 0.65, 3.0])
+    with c_tnw_txt:
+        tnw_str = f"TNW = ${int(round(tnw_total_aud)):,} AUD" if st.session_state["dash_tnw_visible"] else "TNW = ••••••"
+        st.markdown(
+            f"<div style='text-align:right; font-size:1.30rem; font-weight:800; color:#111827; "
+            f"letter-spacing:0.04em; line-height:38px;'>{tnw_str}</div>",
+            unsafe_allow_html=True,
+        )
+    with c_tnw_eye:
+        eye_lbl = "👁" if st.session_state["dash_tnw_visible"] else "🙈"
+        if st.button(eye_lbl, key="btn_toggle_tnw_vis", help="Show / hide Total Net Worth"):
+            st.session_state["dash_tnw_visible"] = not st.session_state["dash_tnw_visible"]
+            st.rerun()
 
 
 # =========================================================================
@@ -4605,23 +4661,7 @@ with pestana2:
 
     total_patrimonio_aud = float(df_inv_activos["Value (AUD)"].sum()) if not df_inv_activos.empty else 0.0
 
-    costos_activos_live = [c for c in datos.get("costos", []) if c.get("activo", True)]
-    ingresos_activos_live = [i for i in datos.get("ingresos", []) if i.get("activo", True)]
-    costo_mensual_vivir_aud = sum(float(c_item.get("monto", 0)) for c_item in costos_activos_live)
-    ingreso_mensual_vivir_aud = sum(float(i_item.get("monto", 0)) for i_item in ingresos_activos_live)
-    datos_cyi_faltantes = (not costos_activos_live) or (not ingresos_activos_live)
 
-    html_panel_salud = construir_html_panel_patrimonio(
-        total_patrimonio_aud=total_patrimonio_aud,
-        cant_activos_contemplados=len(df_inv_activos),
-        cant_activos_totales=len(df_inv_todos),
-        ingreso_mensual_aud=ingreso_mensual_vivir_aud,
-        costo_mensual_aud=costo_mensual_vivir_aud,
-        datos_faltantes=datos_cyi_faltantes
-    )
-    st.markdown(html_panel_salud, unsafe_allow_html=True)
-
-    st.markdown("---")
 
     col_inv_izq, col_inv_der = st.columns([1.05, 1.85], gap="medium")
 
