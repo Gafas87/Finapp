@@ -1236,6 +1236,40 @@ def activar_interactividad_avanzada(cats_costos=None, cats_ingresos=None, ubicac
         if (!win._finappLastSavedTimer) {
             win._finappLastSavedTimer = win.setInterval(actualizarRelojGuardado, 15000);
         }
+        function sincronizarTemaOscuro() {
+            let isDark = false;
+            try {
+                const bgTarget = doc.querySelector('[data-testid="stAppViewContainer"]') || doc.body;
+                const bgStr = win.getComputedStyle(bgTarget).backgroundColor || '';
+                const m = bgStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+                if (m) {
+                    const lum = (0.299 * parseInt(m[1], 10) + 0.587 * parseInt(m[2], 10) + 0.114 * parseInt(m[3], 10)) / 255;
+                    isDark = lum < 0.5;
+                } else if (win.matchMedia && win.matchMedia('(prefers-color-scheme: dark)').matches) {
+                    isDark = true;
+                }
+            } catch (e) {}
+            doc.documentElement.setAttribute('data-finapp-theme', isDark ? 'dark' : 'light');
+
+            const inkCol = isDark ? '#F3F4F6' : '#1F2937';
+            const pieOutCol = isDark ? '#F3F4F6' : '#111828';
+            const lineCol = isDark ? '#CBD5E1' : '#1F2937';
+            doc.querySelectorAll('.js-plotly-plot svg').forEach(svg => {
+                svg.querySelectorAll('.bartext, .ytick text, .xtick text, .gtitle').forEach(t => {
+                    t.style.setProperty('fill', inkCol, 'important');
+                });
+                svg.querySelectorAll('.pie .slicetext text').forEach(t => {
+                    const curFill = (t.style.fill || t.getAttribute('fill') || '').toLowerCase();
+                    if (curFill === '#111828' || curFill === 'rgb(17, 24, 40)' || curFill === '#f3f4f6' || curFill === 'rgb(243, 244, 246)') {
+                        t.style.setProperty('fill', pieOutCol, 'important');
+                    }
+                });
+                svg.querySelectorAll('path.jardin-leader-line, .pie path.textline').forEach(p => {
+                    p.style.setProperty('stroke', lineCol, 'important');
+                });
+            });
+        }
+        sincronizarTemaOscuro();
         posicionarChatbotFlotante();
             estilizarSolapas();
             limpiarInputsYPopups();
@@ -1504,7 +1538,7 @@ def crear_torta_2d(df, col_valores, col_nombres, tamano="mediano", usar_minuscul
         ),
         outsidetextfont=dict(
             size=tam_fuente,
-            color="#111827",
+            color="#111828",
             family="Arial, sans-serif"
         ),
         marker=dict(
@@ -2446,6 +2480,34 @@ def obtener_cotizaciones(simbolos_acciones, simbolos_cripto, simbolos_bonos=()):
 # ----------------- RESPONSIVE CSS STYLES (LAPTOP + MOBILE) -----------------
 st.markdown("""
 <style>
+    :root {
+        --fin-ink: #111827;
+        --fin-ink-soft: #1F2937;
+        --fin-muted: #4B5563;
+        --fin-border-muted: #D1D5DB;
+    }
+    @media (prefers-color-scheme: dark) {
+        :root {
+            --fin-ink: #F3F4F6;
+            --fin-ink-soft: #E5E7EB;
+            --fin-muted: #CBD5E1;
+            --fin-border-muted: #475569;
+        }
+    }
+    :root[data-finapp-theme="light"],
+    html[data-finapp-theme="light"] {
+        --fin-ink: #111827;
+        --fin-ink-soft: #1F2937;
+        --fin-muted: #4B5563;
+        --fin-border-muted: #D1D5DB;
+    }
+    :root[data-finapp-theme="dark"],
+    html[data-finapp-theme="dark"] {
+        --fin-ink: #F3F4F6;
+        --fin-ink-soft: #E5E7EB;
+        --fin-muted: #CBD5E1;
+        --fin-border-muted: #475569;
+    }
     header[data-testid="stHeader"] {
         background: transparent !important;
         background-color: transparent !important;
@@ -2735,9 +2797,9 @@ st.markdown("""
     }
 
     .metric-card {
-        padding: 1.35rem;
-        border-radius: 16px;
-        margin-bottom: 1rem;
+        padding: 0.62rem 1rem;
+        border-radius: 14px;
+        margin-bottom: 0.65rem;
         box-shadow: 0 2px 6px rgba(0,0,0,0.04);
     }
     .metric-card-costo, .metric-card-costos, .metric-card-rojo-pastel {
@@ -2771,10 +2833,11 @@ st.markdown("""
         color: #7C5E10;
     }
     .kpi-title {
-        font-size: 1.15rem;
+        font-size: 0.88rem;
         font-weight: 700;
         color: #111827 !important;
-        margin-bottom: 0.3rem;
+        margin-bottom: 0.12rem;
+        line-height: 1.2;
     }
     [data-testid="stSidebar"] [data-testid="stIconMaterial"],
     [data-testid="stSidebar"] .material-symbols-rounded,
@@ -2788,7 +2851,7 @@ st.markdown("""
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
         font-size: 0.90rem !important;
         font-weight: 600 !important;
-        color: #111827 !important;
+        color: var(--fin-ink) !important;
     }
     [data-testid="stSidebar"] details > summary {
         white-space: nowrap !important;
@@ -2800,56 +2863,99 @@ st.markdown("""
         text-overflow: ellipsis !important;
         margin: 0 !important;
     }
-    div[data-testid="stElementContainer"]:has(> div > .hook-gauge-gear),
-    div[data-testid="stElementContainer"]:has(> div > .hook-gauge-gear-inv) {
+    div[data-testid="stElementContainer"]:has(> div > .hook-odo-row) {
         display: none !important;
     }
-    div[data-testid="stElementContainer"]:has(> div > .hook-gauge-gear) + div[data-testid="stElementContainer"] {
-        margin-top: -54px !important;
-        margin-bottom: 12px !important;
-        padding-left: calc(50% - 114px) !important;
-        position: relative !important;
-        z-index: 10 !important;
+    div[data-testid="stElementContainer"]:has(> div > .hook-odo-row) + div[data-testid="stHorizontalBlock"] {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 8px !important;
+        margin-top: -10px !important;
+        margin-bottom: 6px !important;
     }
-    div[data-testid="stElementContainer"]:has(> div > .hook-gauge-gear-inv) + div[data-testid="stElementContainer"] {
-        margin-top: -76px !important;
-        margin-bottom: 16px !important;
-        padding-left: calc(50% - 114px) !important;
-        position: relative !important;
-        z-index: 10 !important;
+    div[data-testid="stElementContainer"]:has(> div > .hook-odo-row) + div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
+        min-width: 0 !important;
+        width: auto !important;
+        flex: 0 0 auto !important;
     }
-    div[data-testid="stElementContainer"]:has(> div > .hook-gauge-gear) + div[data-testid="stElementContainer"] [data-testid="stPopover"] button,
-    div[data-testid="stElementContainer"]:has(> div > .hook-gauge-gear-inv) + div[data-testid="stElementContainer"] [data-testid="stPopover"] button {
-        height: 34px !important;
-        min-height: 34px !important;
-        width: 34px !important;
-        min-width: 34px !important;
-        padding: 0 !important;
-        border-radius: 9px !important;
+    div[data-testid="stElementContainer"]:has(> div > .hook-odo-row) + div[data-testid="stHorizontalBlock"] [data-testid="stPopover"] button {
+        height: 44px !important;
+        min-height: 44px !important;
+        padding: 0 10px !important;
+        border-radius: 10px !important;
         background: #F8FAFC !important;
         border: 1.5px solid #CBD5E1 !important;
         box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08) !important;
     }
-    .kpi-value {
-        font-size: 2.1rem;
+    .finapp-odo-box {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        height: 44px;
+        background: linear-gradient(180deg, #0B0F17 0%, #161E2B 52%, #0B0F17 100%);
+        border: 1.5px solid #334155;
+        border-radius: 10px;
+        padding: 0 10px;
+        box-shadow: inset 0 2px 5px rgba(0,0,0,0.85), 0 3px 10px rgba(15,23,42,0.12);
+    }
+    .finapp-odo-cell {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 26px;
+        font-family: 'JetBrains Mono', 'Courier New', monospace;
+        font-size: 1.05rem;
         font-weight: 800;
-        line-height: 1.2;
+        color: #FFFFFF;
+        background: rgba(255,255,255,0.05);
+        border-right: 1px solid #334155;
+    }
+    .finapp-odo-cell:last-of-type { border-right: none; }
+    .finapp-odo-sep {
+        color: #94A3B8;
+        font-weight: 700;
+        font-size: 0.95rem;
+        padding: 0 1px;
+    }
+    .finapp-odo-aud {
+        font-size: 0.70rem;
+        font-weight: 700;
+        color: #CBD5E1;
+        margin-left: 5px;
+        letter-spacing: 0.06em;
+    }
+    .finapp-inv-sub {
+        text-align: center;
+        font-size: 0.76rem;
+        color: var(--fin-muted);
+        margin-top: 2px;
+        margin-bottom: 10px;
+    }
+    .kpi-value {
+        font-size: 1.38rem;
+        font-weight: 800;
+        line-height: 1.15;
     }
     .kpi-sub {
-        font-size: 0.95rem;
+        font-size: 0.78rem;
         font-weight: 600;
         color: #111827 !important;
         opacity: 1;
-        margin-top: 0.45rem;
+        margin-top: 0.14rem;
+        line-height: 1.2;
     }
     .col-header {
         font-size: 0.82rem;
         font-weight: 700;
-        color: #4B5563;
+        color: var(--fin-muted);
         text-transform: uppercase;
         letter-spacing: 0.3px;
         padding-bottom: 4px;
-        border-bottom: 2px solid #D1D5DB;
+        border-bottom: 2px solid var(--fin-border-muted);
         margin-bottom: 8px;
         white-space: nowrap !important;
         overflow: visible !important;
@@ -2935,8 +3041,12 @@ st.markdown("""
             padding-left: 0.65rem !important;
             padding-right: 0.65rem !important;
         }
+        .metric-card {
+            padding: 0.55rem 0.85rem !important;
+            margin-bottom: 0.5rem !important;
+        }
         .kpi-value {
-            font-size: 1.65rem !important;
+            font-size: 1.25rem !important;
         }
         .stTabs button[data-baseweb="tab"] {
             padding: 10px 16px !important;
@@ -3265,7 +3375,7 @@ with st.sidebar:
             ev for ev in (eventos_cal_raw or [])
             if "update finapp costs" not in str(ev.get("title", "")).lower()
         ]
-        st.markdown("<div style='font-size:0.95rem; font-weight:700; color:#111827; margin-bottom:8px;'>📅 Coming Payments</div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size:0.95rem; font-weight:700; color:var(--fin-ink); margin-bottom:8px;'>📅 Coming Payments</div>", unsafe_allow_html=True)
         if err_cal:
             st.caption(f"⚠️ {err_cal}")
         elif not eventos_cal:
@@ -3642,7 +3752,7 @@ def _html_gauge_cluster_card(cfg, val_aud, idx=0, super_aud=None):
     max_int = int(round(max_val))
     angle_target = max(0.0, min(180.0, (float(val_aud) / max_val) * 180.0))
 
-    cx, cy, r = 150.0, 138.0, 106.0
+    cx, cy, r = 150.0, 136.0, 104.0
 
     def pt(ang_deg, rad=r):
         rad_a = _m.radians(180.0 - ang_deg)
@@ -3672,8 +3782,8 @@ def _html_gauge_cluster_card(cfg, val_aud, idx=0, super_aud=None):
         tx1, ty1 = pt(ang, r_in)
         tx2, ty2 = pt(ang, r_out)
         sw = "1.7" if is_maj else "0.9"
-        col_t = "#475569" if is_maj else "#CBD5E1"
-        ticks.append(f'<line x1="{tx1:.1f}" y1="{ty1:.1f}" x2="{tx2:.1f}" y2="{ty2:.1f}" stroke="{col_t}" stroke-width="{sw}" stroke-linecap="round"/>')
+        cls_t = "tick-maj" if is_maj else "tick-min"
+        ticks.append(f'<line class="{cls_t}" x1="{tx1:.1f}" y1="{ty1:.1f}" x2="{tx2:.1f}" y2="{ty2:.1f}" stroke-width="{sw}" stroke-linecap="round"/>')
 
     def fmt_k(n):
         if n >= 1000 and n % 1000 == 0:
@@ -3682,24 +3792,6 @@ def _html_gauge_cluster_card(cfg, val_aud, idx=0, super_aud=None):
 
     mid_lbl = fmt_k(target_int)
     max_lbl = fmt_k(max_int) + ("+" if is_inv else "")
-
-    val_str = f"{val_int:,}"
-    cells_html = "".join(
-        f'<span class="odo-sep">,</span>' if ch == "," else f'<span class="odo-cell">{ch}</span>'
-        for ch in val_str
-    )
-
-    extra_inv_html = ""
-    if is_inv and super_aud is not None:
-        sup_int = max(0, int(round(super_aud)))
-        tot_int = val_int + sup_int
-        extra_inv_html = f"""
-        <div class="inv-sub-row">
-          <span>SUPER <b>{sup_int:,} AUD</b></span>
-          <span class="inv-dot">·</span>
-          <span>TOTAL <b>{tot_int:,} AUD</b></span>
-        </div>
-        """
 
     uid = f"g_{cfg['id']}_{idx}"
     delay_ms = idx * 90
@@ -3710,6 +3802,44 @@ def _html_gauge_cluster_card(cfg, val_aud, idx=0, super_aud=None):
 <head>
 <meta charset="utf-8">
 <style>
+  :root {{
+    --g-title: #0F172A;
+    --g-scale: #475569;
+    --g-dial-bg: #F8FAFC;
+    --g-dial-edge: #E2E8F0;
+    --g-track: #E2E8F0;
+    --g-tick-maj: #475569;
+    --g-tick-min: #CBD5E1;
+  }}
+  @media (prefers-color-scheme: dark) {{
+    :root {{
+      --g-title: #F3F4F6;
+      --g-scale: #CBD5E1;
+      --g-dial-bg: #161B22;
+      --g-dial-edge: #334155;
+      --g-track: #262E3B;
+      --g-tick-maj: #94A3B8;
+      --g-tick-min: #475569;
+    }}
+  }}
+  html[data-theme="dark"] {{
+    --g-title: #F3F4F6;
+    --g-scale: #CBD5E1;
+    --g-dial-bg: #161B22;
+    --g-dial-edge: #334155;
+    --g-track: #262E3B;
+    --g-tick-maj: #94A3B8;
+    --g-tick-min: #475569;
+  }}
+  html[data-theme="light"] {{
+    --g-title: #0F172A;
+    --g-scale: #475569;
+    --g-dial-bg: #F8FAFC;
+    --g-dial-edge: #E2E8F0;
+    --g-track: #E2E8F0;
+    --g-tick-maj: #475569;
+    --g-tick-min: #CBD5E1;
+  }}
   * {{ box-sizing: border-box; margin: 0; padding: 0; }}
   body {{
     background: transparent;
@@ -3718,89 +3848,35 @@ def _html_gauge_cluster_card(cfg, val_aud, idx=0, super_aud=None):
   }}
   .cluster-card {{
     background: transparent;
-    padding: 6px 6px 8px 6px;
+    padding: 4px 4px 0 4px;
     text-align: center;
-    color: #0F172A;
   }}
   .gauge-head {{
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 8px;
     margin-bottom: 2px;
   }}
   .gauge-title {{
     font-size: 0.84rem;
     font-weight: 800;
     letter-spacing: 0.14em;
-    color: #0F172A;
+    color: var(--g-title);
     text-transform: uppercase;
-  }}
-  .status-chip {{
-    font-size: 0.65rem;
-    font-weight: 800;
-    letter-spacing: 0.08em;
-    padding: 2px 8px;
-    border-radius: 999px;
-    background: {estado_col}1A;
-    color: {estado_col};
-    border: 1px solid {estado_col}66;
   }}
   svg {{
     width: 100%;
-    max-width: 286px;
+    max-width: 280px;
     height: auto;
     display: block;
     margin: 0 auto;
     overflow: visible;
   }}
-  .odo-wrap {{
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
-    background: linear-gradient(180deg, #0B0F17 0%, #161E2B 52%, #0B0F17 100%);
-    border: 1.5px solid #CBD5E1;
-    border-radius: 9px;
-    padding: 4px 9px;
-    box-shadow: inset 0 2px 5px rgba(0,0,0,0.85), 0 3px 10px rgba(15,23,42,0.10);
-    margin-top: -6px;
-    margin-left: 38px;
-  }}
-  .odo-cell {{
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 16px;
-    height: 24px;
-    font-family: 'JetBrains Mono', 'Courier New', monospace;
-    font-size: 1.02rem;
-    font-weight: 800;
-    color: #FFFFFF;
-    background: rgba(255,255,255,0.04);
-    border-right: 1px solid #334155;
-  }}
-  .odo-cell:last-of-type {{ border-right: none; }}
-  .odo-sep {{
-    color: #94A3B8;
-    font-weight: 700;
-    font-size: 0.95rem;
-    padding: 0 1px;
-  }}
-  .odo-aud {{
-    font-size: 0.68rem;
-    font-weight: 700;
-    color: #CBD5E1;
-    margin-left: 5px;
-    letter-spacing: 0.06em;
-  }}
-  .inv-sub-row {{
-    margin-top: 6px;
-    font-size: 0.72rem;
-    color: #475569;
-    letter-spacing: 0.04em;
-  }}
-  .inv-sub-row b {{ color: #0F172A; font-family: monospace; font-size: 0.78rem; }}
-  .inv-dot {{ margin: 0 6px; color: #94A3B8; }}
+  .dial-bg {{ fill: var(--g-dial-bg); stroke: var(--g-dial-edge); stroke-width: 1.2; }}
+  .dial-track {{ fill: none; stroke: var(--g-track); stroke-width: 12; }}
+  .scale-lbl {{ fill: var(--g-scale); font-size: 10.5px; font-weight: 700; }}
+  .tick-maj {{ stroke: var(--g-tick-maj); }}
+  .tick-min {{ stroke: var(--g-tick-min); }}
 </style>
 </head>
 <body>
@@ -3808,54 +3884,45 @@ def _html_gauge_cluster_card(cfg, val_aud, idx=0, super_aud=None):
     <div class="gauge-head">
       <span class="gauge-title">{cfg['name']}</span>
     </div>
-    <svg viewBox="0 0 300 158">
+    <svg viewBox="0 0 300 154">
       <defs>
         <filter id="{uid}_shadow" x="-30%" y="-30%" width="160%" height="160%">
           <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0F172A" flood-opacity="0.32"/>
         </filter>
-        <radialGradient id="{uid}_dial" cx="50%" cy="95%" r="85%">
-          <stop offset="0%" stop-color="#FFFFFF"/>
-          <stop offset="80%" stop-color="#F8FAFC"/>
-          <stop offset="100%" stop-color="#F1F5F9"/>
-        </radialGradient>
         <radialGradient id="{uid}_hub" cx="38%" cy="32%" r="68%">
           <stop offset="0%" stop-color="#64748B"/>
           <stop offset="55%" stop-color="#1E293B"/>
           <stop offset="100%" stop-color="#0F172A"/>
         </radialGradient>
       </defs>
-      <!-- Modern circular-arc dial backdrop (no dark square box) -->
-      <path d="M 30 138 A 120 120 0 0 1 270 138 Z" fill="url(#{uid}_dial)" stroke="#E2E8F0" stroke-width="1.2"/>
-      <path d="M 44 138 A 106 106 0 0 1 256 138" fill="none" stroke="#E2E8F0" stroke-width="12"/>
+      <path class="dial-bg" d="M 32 136 A 118 118 0 0 1 268 136 Z"/>
+      <path class="dial-track" d="M 46 136 A 104 104 0 0 1 254 136"/>
       {''.join(arc_paths)}
       {''.join(ticks)}
-      <text x="20" y="152" fill="#64748B" font-size="10.5" font-weight="700" text-anchor="middle">0</text>
-      <text x="150" y="14" fill="#475569" font-size="10.5" font-weight="700" text-anchor="middle">{mid_lbl}</text>
-      <text x="280" y="152" fill="#64748B" font-size="10.5" font-weight="700" text-anchor="middle">{max_lbl}</text>
-      <g id="{uid}_needle" transform="rotate(-90 150 138)" filter="url(#{uid}_shadow)">
-        <polygon points="147.8,138 152.2,138 150.7,40 149.3,40" fill="#FF4D2A"/>
+      <text class="scale-lbl" x="20" y="150" text-anchor="middle">0</text>
+      <text class="scale-lbl" x="150" y="15" text-anchor="middle">{mid_lbl}</text>
+      <text class="scale-lbl" x="280" y="150" text-anchor="middle">{max_lbl}</text>
+      <g id="{uid}_needle" transform="rotate(-90 150 136)" filter="url(#{uid}_shadow)">
+        <polygon points="147.8,136 152.2,136 150.7,40 149.3,40" fill="#FF4D2A"/>
       </g>
-      <circle cx="150" cy="138" r="11" fill="url(#{uid}_hub)" stroke="#CBD5E1" stroke-width="1.5"/>
+      <circle cx="150" cy="136" r="11" fill="url(#{uid}_hub)" stroke="#CBD5E1" stroke-width="1.5"/>
     </svg>
-    <div class="odo-wrap" id="{uid}_odo">{cells_html}<span class="odo-aud">AUD</span></div>
-    {extra_inv_html}
   </div>
   <script>
     (function() {{
-      const needle = document.getElementById('{uid}_needle');
-      const odo = document.getElementById('{uid}_odo');
-      const targetAngle = {angle_target:.2f};
-      const targetVal = {val_int};
-      let played = false;
-
-      function formatCells(n) {{
-        const s = Math.max(0, Math.round(n)).toLocaleString('en-US');
-        let h = '';
-        for (const ch of s) {{
-          h += ch === ',' ? '<span class="odo-sep">,</span>' : '<span class="odo-cell">' + ch + '</span>';
+      try {{
+        const pApp = window.parent.document.querySelector('[data-testid="stAppViewContainer"]') || window.parent.document.body;
+        const bg = window.parent.getComputedStyle(pApp).backgroundColor;
+        const m = bg && bg.match(/\d+/g);
+        if (m && m.length >= 3) {{
+          const lum = (0.299 * +m[0] + 0.587 * +m[1] + 0.114 * +m[2]);
+          document.documentElement.setAttribute('data-theme', lum < 128 ? 'dark' : 'light');
         }}
-        return h + '<span class="odo-aud">AUD</span>';
-      }}
+      }} catch (e) {{}}
+
+      const needle = document.getElementById('{uid}_needle');
+      const targetAngle = {angle_target:.2f};
+      let played = false;
 
       function easeOutBack(t) {{
         const c1 = 1.15;
@@ -3874,14 +3941,11 @@ def _html_gauge_cluster_card(cfg, val_aud, idx=0, super_aud=None):
           const p = Math.min(1, (now - start) / duration);
           const eased = easeOutBack(p);
           const curAng = Math.max(0, Math.min(182, targetAngle * eased));
-          needle.setAttribute('transform', 'rotate(' + (curAng - 90).toFixed(2) + ' 150 138)');
-          const odoEase = 1 - Math.pow(1 - p, 3);
-          odo.innerHTML = formatCells(targetVal * odoEase);
+          needle.setAttribute('transform', 'rotate(' + (curAng - 90).toFixed(2) + ' 150 136)');
           if (p < 1) {{
             requestAnimationFrame(frame);
           }} else {{
-            needle.setAttribute('transform', 'rotate(' + (targetAngle - 90).toFixed(2) + ' 150 138)');
-            odo.innerHTML = formatCells(targetVal);
+            needle.setAttribute('transform', 'rotate(' + (targetAngle - 90).toFixed(2) + ' 150 136)');
           }}
         }}
         requestAnimationFrame(frame);
@@ -3894,7 +3958,7 @@ def _html_gauge_cluster_card(cfg, val_aud, idx=0, super_aud=None):
             playIgnition();
           }} else if (!en.isIntersecting) {{
             played = false;
-            needle.setAttribute('transform', 'rotate(-90 150 138)');
+            needle.setAttribute('transform', 'rotate(-90 150 136)');
           }}
         }});
       }}, {{ threshold: 0.15 }});
@@ -3906,15 +3970,29 @@ def _html_gauge_cluster_card(cfg, val_aud, idx=0, super_aud=None):
 """
 
 
+def _html_odometer_box(val_aud):
+    val_int = max(0, int(round(val_aud)))
+    val_str = f"{val_int:,}"
+    cells_html = "".join(
+        "<span class='finapp-odo-sep'>,</span>" if ch == "," else f"<span class='finapp-odo-cell'>{ch}</span>"
+        for ch in val_str
+    )
+    return f"<div class='finapp-odo-box'>{cells_html}<span class='finapp-odo-aud'>AUD</span></div>"
+
+
 # ----------------- MAIN TABS (REORDERABLE) -----------------
 DEFAULT_TAB_ORDER = [
-    "🎛️ DASHBOARD",
+    "⚙️ DASHBOARD",
     "📊 COSTS & INCOME",
     "💼 TOTAL NET WORTH",
     "⚡ LIVE CASH FLOW"
 ]
 
 orden_tabs_guardado = datos.get("tab_order", DEFAULT_TAB_ORDER)
+if isinstance(orden_tabs_guardado, list) and "🎛️ DASHBOARD" in orden_tabs_guardado:
+    orden_tabs_guardado = ["⚙️ DASHBOARD" if t == "🎛️ DASHBOARD" else t for t in orden_tabs_guardado]
+    datos["tab_order"] = orden_tabs_guardado
+    guardar_datos(datos, registrar_cambio=False)
 if (
     not isinstance(orden_tabs_guardado, list)
     or set(orden_tabs_guardado) != set(DEFAULT_TAB_ORDER)
@@ -3930,7 +4008,7 @@ if st.button("⇄", key="btn_cycle_tabs_order", help="Switch tab order"):
 
 tabs_creadas = st.tabs(orden_tabs_guardado)
 mapa_tabs = dict(zip(orden_tabs_guardado, tabs_creadas))
-pestana0 = mapa_tabs["🎛️ DASHBOARD"]
+pestana0 = mapa_tabs["⚙️ DASHBOARD"]
 pestana1 = mapa_tabs["📊 COSTS & INCOME"]
 pestana2 = mapa_tabs["💼 TOTAL NET WORTH"]
 pestana3 = mapa_tabs["⚡ LIVE CASH FLOW"]
@@ -3959,37 +4037,47 @@ with pestana0:
             with cols_dash[col_i]:
                 components.html(
                     _html_gauge_cluster_card(g_cfg, val_actual, idx=g_idx, super_aud=sup_extra),
-                    height=268 if g_cfg.get("is_investments") else 246,
+                    height=188,
                 )
-                hook_cls = "hook-gauge-gear-inv" if g_cfg.get("is_investments") else "hook-gauge-gear"
-                st.markdown(f"<div class='{hook_cls}' style='display:none;'></div>", unsafe_allow_html=True)
-                with st.popover("⚙️", help=f"Configure {g_cfg['name']} gauge"):
-                    cur_max = int(g_cfg.get("max", base_cfg["max"]))
-                    new_max = st.number_input(
-                        "Max value (AUD)",
-                        min_value=100,
-                        max_value=5000000,
-                        value=cur_max,
-                        step=500,
-                        key=f"dash_max_{g_id}",
+                st.markdown("<div class='hook-odo-row' style='display:none;'></div>", unsafe_allow_html=True)
+                c_gear, c_odo = st.columns([0.85, 3.15], gap="small")
+                with c_odo:
+                    st.markdown(_html_odometer_box(val_actual), unsafe_allow_html=True)
+                with c_gear:
+                    with st.popover("⚙️", help=f"Configure {g_cfg['name']} gauge"):
+                        cur_max = int(g_cfg.get("max", base_cfg["max"]))
+                        new_max = st.number_input(
+                            "Max value (AUD)",
+                            min_value=100,
+                            max_value=5000000,
+                            value=cur_max,
+                            step=500,
+                            key=f"dash_max_{g_id}",
+                        )
+                        cur_o1 = max(0, min(int(g_cfg.get("opt_start", base_cfg["opt_start"])), int(new_max)))
+                        cur_o2 = max(cur_o1, min(int(g_cfg.get("opt_end", base_cfg["opt_end"])), int(new_max)))
+                        lbl_rng = "OK / NICE range (AUD)" if g_cfg.get("is_investments") else "Optimal range (AUD)"
+                        new_o1, new_o2 = st.slider(
+                            lbl_rng,
+                            min_value=0,
+                            max_value=int(new_max),
+                            value=(cur_o1, cur_o2),
+                            step=50 if int(new_max) <= 5000 else 100,
+                            key=f"dash_rng_{g_id}",
+                        )
+                        if new_max != cur_max or new_o1 != cur_o1 or new_o2 != cur_o2:
+                            g_cfg["max"] = int(new_max)
+                            g_cfg["opt_start"] = int(new_o1)
+                            g_cfg["opt_end"] = int(new_o2)
+                            guardar_datos(datos, registrar_cambio=False)
+                            st.rerun()
+                if g_cfg.get("is_investments") and sup_extra is not None:
+                    _sup_i = max(0, int(round(sup_extra)))
+                    _tot_i = max(0, int(round(val_actual))) + _sup_i
+                    st.markdown(
+                        f"<div class='finapp-inv-sub'>SUPER <b>{_sup_i:,} AUD</b> &nbsp;·&nbsp; TOTAL <b>{_tot_i:,} AUD</b></div>",
+                        unsafe_allow_html=True,
                     )
-                    cur_o1 = max(0, min(int(g_cfg.get("opt_start", base_cfg["opt_start"])), int(new_max)))
-                    cur_o2 = max(cur_o1, min(int(g_cfg.get("opt_end", base_cfg["opt_end"])), int(new_max)))
-                    lbl_rng = "OK / NICE range (AUD)" if g_cfg.get("is_investments") else "Optimal range (AUD)"
-                    new_o1, new_o2 = st.slider(
-                        lbl_rng,
-                        min_value=0,
-                        max_value=int(new_max),
-                        value=(cur_o1, cur_o2),
-                        step=50 if int(new_max) <= 5000 else 100,
-                        key=f"dash_rng_{g_id}",
-                    )
-                    if new_max != cur_max or new_o1 != cur_o1 or new_o2 != cur_o2:
-                        g_cfg["max"] = int(new_max)
-                        g_cfg["opt_start"] = int(new_o1)
-                        g_cfg["opt_end"] = int(new_o2)
-                        guardar_datos(datos, registrar_cambio=False)
-                        st.rerun()
 
 
     tnw_total_aud = sum(
@@ -4004,7 +4092,7 @@ with pestana0:
     with c_tnw_txt:
         tnw_str = f"TNW = ${int(round(tnw_total_aud)):,} AUD" if st.session_state["dash_tnw_visible"] else "TNW = ••••••"
         st.markdown(
-            f"<div style='text-align:right; font-size:1.30rem; font-weight:800; color:#111827; "
+            f"<div style='text-align:right; font-size:1.30rem; font-weight:800; color:var(--fin-ink); "
             f"letter-spacing:0.04em; line-height:38px;'>{tnw_str}</div>",
             unsafe_allow_html=True,
         )
@@ -4091,7 +4179,7 @@ with pestana1:
 
     # ---------------- COSTS ----------------
     with col_izq:
-        st.markdown("<h3 style='color: #111827; margin-bottom: 6px;'>📉 My Weekly Costs</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='color: var(--fin-ink); margin-bottom: 6px;'>📉 My Weekly Costs</h3>", unsafe_allow_html=True)
         st.markdown("<div class='hook-agregar-costo' style='display:none;'></div>", unsafe_allow_html=True)
 
         with st.expander("➕ ADD NEW COST CATEGORY"):
@@ -4266,7 +4354,7 @@ with pestana1:
 
     # ---------------- INCOME ----------------
     with col_der:
-        st.markdown("<h3 style='color: #111827; margin-bottom: 6px;'>📈 My Weekly Income</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='color: var(--fin-ink); margin-bottom: 6px;'>📈 My Weekly Income</h3>", unsafe_allow_html=True)
         st.markdown("<div class='hook-agregar-ingreso' style='display:none;'></div>", unsafe_allow_html=True)
 
         with st.expander("➕ ADD NEW INCOME CATEGORY"):
@@ -4442,7 +4530,7 @@ with pestana1:
     st.markdown("---")
 
     st.markdown(
-        "<h3 style='color: #111827;'>📊 Charts & Tables</h3>",
+        "<h3 style='color: var(--fin-ink);'>📊 Charts & Tables</h3>",
         unsafe_allow_html=True
     )
     modo_grafico = st.radio(
@@ -4457,7 +4545,7 @@ with pestana1:
 
     with col_chart_c:
         st.markdown(
-            "<h4 style='color: #111827; text-align: center;'>Costs Breakdown</h4>",
+            "<h4 style='color: var(--fin-ink); text-align: center;'>Costs Breakdown</h4>",
             unsafe_allow_html=True
         )
         if costos_activos and total_costos > 0:
@@ -4496,7 +4584,7 @@ with pestana1:
 
     with col_chart_i:
         st.markdown(
-            "<h4 style='color: #111827; text-align: center;'>Income Breakdown</h4>",
+            "<h4 style='color: var(--fin-ink); text-align: center;'>Income Breakdown</h4>",
             unsafe_allow_html=True
         )
         if ingresos_activos and total_ingresos > 0:
@@ -4668,7 +4756,7 @@ with pestana2:
     # ---------------- ADD ASSET ----------------
     with col_inv_izq:
         st.markdown(
-            "<h3 style='color: #5B4B8A;'>➕ Add Asset</h3>",
+            "<h3 style='color: var(--fin-ink);'>➕ Add Asset</h3>",
             unsafe_allow_html=True
         )
         opciones_tipo = [
@@ -4987,7 +5075,7 @@ with pestana2:
     # ---------------- MY ASSETS ----------------
     with col_inv_der:
         st.markdown(
-            "<h3 style='color: #5B4B8A;'>📋 My Assets by Category</h3>",
+            "<h3 style='color: var(--fin-ink);'>📋 My Assets by Category</h3>",
             unsafe_allow_html=True
         )
         orden_categorias_inv = [
@@ -5122,7 +5210,7 @@ with pestana2:
     st.markdown("---")
 
     st.markdown(
-        "<h3 style='color: #5B4B8A;'>💼 Net Worth Breakdown</h3>",
+        "<h3 style='color: var(--fin-ink);'>💼 Net Worth Breakdown</h3>",
         unsafe_allow_html=True
     )
     if not df_inv_activos.empty and total_patrimonio_aud > 0:
@@ -5130,7 +5218,7 @@ with pestana2:
 
         with col_g_inv1:
             st.markdown(
-                "<h4 style='color: #5B4B8A; text-align: center;'>By Asset Type</h4>",
+                "<h4 style='color: var(--fin-ink); text-align: center;'>By Asset Type</h4>",
                 unsafe_allow_html=True
             )
             resumen_tipo = df_inv_activos.groupby("Type", as_index=False).agg({
@@ -5149,7 +5237,7 @@ with pestana2:
 
         with col_g_inv2:
             st.markdown(
-                "<h4 style='color: #5B4B8A; text-align: center;'>By Location</h4>",
+                "<h4 style='color: var(--fin-ink); text-align: center;'>By Location</h4>",
                 unsafe_allow_html=True
             )
             df_det = df_inv_activos.sort_values(by="Value (AUD)", ascending=False).copy()
