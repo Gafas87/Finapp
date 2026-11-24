@@ -801,101 +801,29 @@ def activar_interactividad_avanzada(cats_costos=None, cats_ingresos=None, ubicac
             });
         }
 
-        // 1. Style main tabs as clean pill buttons
+        // 1. Align "⇄" cycle-tabs button right after the last tab on desktop (or pinned right on mobile scroll)
         function estilizarSolapas() {
-            const highlights = doc.querySelectorAll('[data-baseweb="tab-highlight"], [data-baseweb="tab-border"]');
-            highlights.forEach(el => {
-                el.style.setProperty('display', 'none', 'important');
-                el.style.setProperty('height', '0px', 'important');
-                el.style.setProperty('background', 'transparent', 'important');
-                el.style.setProperty('background-color', 'transparent', 'important');
-                el.style.setProperty('border', 'none', 'important');
-            });
-
             const tabLists = doc.querySelectorAll('[data-baseweb="tab-list"]');
-            tabLists.forEach(tl => {
-                tl.style.setProperty('height', 'auto', 'important');
-                tl.style.setProperty('min-height', '68px', 'important');
-                tl.style.setProperty('overflow', 'visible', 'important');
-                tl.style.setProperty('padding', '8px 4px', 'important');
-                tl.style.setProperty('gap', '14px', 'important');
-                tl.style.setProperty('align-items', 'center', 'important');
-                tl.style.setProperty('border', 'none', 'important');
-            });
-
-            const tabs = doc.querySelectorAll('button[data-baseweb="tab"]');
-            tabs.forEach(tab => {
-                const isSelected = tab.getAttribute('aria-selected') === 'true';
-                tab.style.setProperty('border-radius', '999px', 'important');
-                tab.style.setProperty('min-height', '54px', 'important');
-                tab.style.setProperty('height', 'auto', 'important');
-                tab.style.setProperty('padding', '10px 26px', 'important');
-                tab.style.setProperty('transition', 'all 0.25s ease-in-out', 'important');
-                tab.style.setProperty('overflow', 'visible', 'important');
-
-                if (isSelected) {
-                    tab.style.setProperty('background', '#E0F2FE', 'important');
-                    tab.style.setProperty('background-color', '#E0F2FE', 'important');
-                    tab.style.setProperty('border', '2px solid #7DD3FC', 'important');
-                    tab.style.setProperty('box-shadow', '0 4px 14px rgba(14, 116, 144, 0.14)', 'important');
-                } else {
-                    tab.style.setProperty('background', '#F9FAFB', 'important');
-                    tab.style.setProperty('background-color', '#F9FAFB', 'important');
-                    tab.style.setProperty('border', '1.5px solid #E5E7EB', 'important');
-                    tab.style.setProperty('box-shadow', '0 2px 6px rgba(0, 0, 0, 0.04)', 'important');
-                }
-
-                const p = tab.querySelector('[data-testid="stMarkdownContainer"] p') || tab.querySelector('p');
-                if (p) {
-                    p.style.setProperty('font-size', '1.12rem', 'important');
-                    p.style.setProperty('font-weight', '800', 'important');
-                    p.style.setProperty('color', isSelected ? '#0C4A6E' : '#4B5563', 'important');
-                    p.style.setProperty('margin', '0px', 'important');
-                    p.style.setProperty('display', 'inline-flex', 'important');
-                    p.style.setProperty('align-items', 'center', 'important');
-                    p.style.setProperty('gap', '8px', 'important');
-                }
-            });
-
-            // Align "⇄" cycle-tabs button right next to the last main tab
             if (tabLists.length > 0) {
-                const mainTabBtns = tabLists[0].querySelectorAll('button[data-baseweb="tab"]');
+                const tl = tabLists[0];
+                const mainTabBtns = tl.querySelectorAll('button[data-baseweb="tab"]');
                 if (mainTabBtns.length > 0) {
                     const lastTab = mainTabBtns[mainTabBtns.length - 1];
+                    const tlRect = tl.getBoundingClientRect();
                     const lastRect = lastTab.getBoundingClientRect();
                     doc.querySelectorAll('button').forEach(btn => {
                         if ((btn.innerText || '').trim() === '⇄') {
-                            const wrap = btn.closest('[data-testid="stButton"]') || btn.parentElement;
-                            const elemCont = btn.closest('[data-testid="element-container"]');
+                            const elemCont = btn.closest('[data-testid="stElementContainer"]') || btn.closest('[data-testid="element-container"]');
                             if (elemCont) {
-                                elemCont.style.setProperty('height', '0px', 'important');
-                                elemCont.style.setProperty('min-height', '0px', 'important');
-                                elemCont.style.setProperty('margin', '0px', 'important');
-                                elemCont.style.setProperty('padding', '0px', 'important');
-                                elemCont.style.setProperty('overflow', 'visible', 'important');
-                            }
-                            btn.style.setProperty('border-radius', '999px', 'important');
-                            btn.style.setProperty('min-height', '44px', 'important');
-                            btn.style.setProperty('height', '44px', 'important');
-                            btn.style.setProperty('width', '44px', 'important');
-                            btn.style.setProperty('padding', '0', 'important');
-                            btn.style.setProperty('background', '#F9FAFB', 'important');
-                            btn.style.setProperty('border', '1.5px solid #E5E7EB', 'important');
-                            btn.style.setProperty('box-shadow', '0 2px 6px rgba(0, 0, 0, 0.04)', 'important');
-                            btn.style.setProperty('color', '#4B5563', 'important');
-                            const bp = btn.querySelector('p');
-                            if (bp) {
-                                bp.style.setProperty('font-size', '1.2rem', 'important');
-                                bp.style.setProperty('font-weight', '800', 'important');
-                                bp.style.setProperty('margin', '0', 'important');
-                            }
-                            if (wrap && lastRect.width > 0 && (lastRect.right + 64) < win.innerWidth) {
-                                wrap.style.setProperty('position', 'fixed', 'important');
-                                wrap.style.setProperty('top', Math.round(lastRect.top + (lastRect.height - 44) / 2) + 'px', 'important');
-                                wrap.style.setProperty('left', Math.round(lastRect.right + 12) + 'px', 'important');
-                                wrap.style.setProperty('z-index', '99', 'important');
-                                wrap.style.setProperty('width', 'auto', 'important');
-                                wrap.style.setProperty('visibility', lastRect.top < 42 ? 'hidden' : 'visible', 'important');
+                                const hostRect = elemCont.getBoundingClientRect();
+                                const fitsDesktop = (tl.scrollWidth <= tl.clientWidth + 4) && (lastRect.right + 48 < tlRect.right);
+                                if (fitsDesktop && lastRect.width > 0 && hostRect.width > 0) {
+                                    btn.style.setProperty('left', Math.round(lastRect.right - hostRect.left + 10) + 'px', 'important');
+                                    btn.style.setProperty('right', 'auto', 'important');
+                                } else {
+                                    btn.style.setProperty('left', 'auto', 'important');
+                                    btn.style.setProperty('right', '2px', 'important');
+                                }
                             }
                         }
                     });
@@ -1239,14 +1167,24 @@ def activar_interactividad_avanzada(cats_costos=None, cats_ingresos=None, ubicac
         function sincronizarTemaOscuro() {
             let isDark = false;
             try {
-                const bgTarget = doc.querySelector('[data-testid="stAppViewContainer"]') || doc.body;
-                const bgStr = win.getComputedStyle(bgTarget).backgroundColor || '';
-                const m = bgStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
-                if (m) {
-                    const lum = (0.299 * parseInt(m[1], 10) + 0.587 * parseInt(m[2], 10) + 0.114 * parseInt(m[3], 10)) / 255;
-                    isDark = lum < 0.5;
-                } else if (win.matchMedia && win.matchMedia('(prefers-color-scheme: dark)').matches) {
-                    isDark = true;
+                const candidates = [
+                    doc.querySelector('[data-testid="stAppViewContainer"]'),
+                    doc.querySelector('.stApp'),
+                    doc.body,
+                    doc.documentElement
+                ];
+                for (const el of candidates) {
+                    if (!el) continue;
+                    const bgStr = win.getComputedStyle(el).backgroundColor || '';
+                    const m = bgStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?/i);
+                    if (m) {
+                        const alpha = m[4] !== undefined ? parseFloat(m[4]) : 1.0;
+                        if (alpha > 0.1) {
+                            const lum = (0.299 * parseInt(m[1], 10) + 0.587 * parseInt(m[2], 10) + 0.114 * parseInt(m[3], 10)) / 255;
+                            isDark = lum < 0.5;
+                            break;
+                        }
+                    }
                 }
             } catch (e) {}
             doc.documentElement.setAttribute('data-finapp-theme', isDark ? 'dark' : 'light');
@@ -1476,6 +1414,17 @@ def formatear_etiqueta_torta(texto, usar_minusculas=False):
     return t
 
 
+def _detectar_tema_oscuro():
+    try:
+        ctx_theme = getattr(getattr(st, "context", None), "theme", None)
+        t_type = getattr(ctx_theme, "type", None)
+        if isinstance(t_type, str) and t_type.lower() in ("dark", "light"):
+            return t_type.lower() == "dark"
+    except Exception:
+        pass
+    return False
+
+
 def crear_torta_2d(df, col_valores, col_nombres, tamano="mediano", usar_minusculas=False, paleta=None):
     valores = df[col_valores].tolist()
     nombres = [formatear_etiqueta_torta(nom, usar_minusculas=usar_minusculas) for nom in df[col_nombres].tolist()]
@@ -1538,7 +1487,7 @@ def crear_torta_2d(df, col_valores, col_nombres, tamano="mediano", usar_minuscul
         ),
         outsidetextfont=dict(
             size=tam_fuente,
-            color="#111828",
+            color="#F3F4F6" if _detectar_tema_oscuro() else "#111828",
             family="Arial, sans-serif"
         ),
         marker=dict(
@@ -1585,7 +1534,7 @@ def crear_barras_horizontales(df, col_valores, col_nombres, color_barra=None):
         cliponaxis=False,
         textfont=dict(
             size=14,
-            color="#1F2937",
+            color="#F3F4F6" if _detectar_tema_oscuro() else "#1F2937",
             family="Arial, sans-serif"
         ),
         marker=dict(
@@ -1620,7 +1569,7 @@ def crear_barras_horizontales(df, col_valores, col_nombres, color_barra=None):
             automargin=True,
             tickfont=dict(
                 size=13,
-                color="#1F2937",
+                color="#F3F4F6" if _detectar_tema_oscuro() else "#1F2937",
                 family="Arial, sans-serif"
             )
         )
@@ -2478,36 +2427,39 @@ def obtener_cotizaciones(simbolos_acciones, simbolos_cripto, simbolos_bonos=()):
 
 
 # ----------------- RESPONSIVE CSS STYLES (LAPTOP + MOBILE) -----------------
-st.markdown("""
+_es_tema_oscuro = _detectar_tema_oscuro()
+_css_ink = "var(--text-color, #F3F4F6)" if _es_tema_oscuro else "var(--text-color, #111827)"
+_css_ink_soft = "var(--text-color, #E5E7EB)" if _es_tema_oscuro else "var(--text-color, #1F2937)"
+_css_muted = "#CBD5E1" if _es_tema_oscuro else "#4B5563"
+_css_border_muted = "#475569" if _es_tema_oscuro else "#D1D5DB"
+
+st.markdown(f"""
 <style>
-    :root {
-        --fin-ink: #111827;
-        --fin-ink-soft: #1F2937;
-        --fin-muted: #4B5563;
-        --fin-border-muted: #D1D5DB;
-    }
-    @media (prefers-color-scheme: dark) {
-        :root {
-            --fin-ink: #F3F4F6;
-            --fin-ink-soft: #E5E7EB;
-            --fin-muted: #CBD5E1;
-            --fin-border-muted: #475569;
-        }
-    }
+    :root {{
+        --fin-ink: {_css_ink};
+        --fin-ink-soft: {_css_ink_soft};
+        --fin-muted: {_css_muted};
+        --fin-border-muted: {_css_border_muted};
+    }}
     :root[data-finapp-theme="light"],
-    html[data-finapp-theme="light"] {
-        --fin-ink: #111827;
-        --fin-ink-soft: #1F2937;
+    html[data-finapp-theme="light"] {{
+        --fin-ink: var(--text-color, #111827);
+        --fin-ink-soft: var(--text-color, #1F2937);
         --fin-muted: #4B5563;
         --fin-border-muted: #D1D5DB;
-    }
+    }}
     :root[data-finapp-theme="dark"],
-    html[data-finapp-theme="dark"] {
-        --fin-ink: #F3F4F6;
-        --fin-ink-soft: #E5E7EB;
+    html[data-finapp-theme="dark"] {{
+        --fin-ink: var(--text-color, #F3F4F6);
+        --fin-ink-soft: var(--text-color, #E5E7EB);
         --fin-muted: #CBD5E1;
         --fin-border-muted: #475569;
-    }
+    }}
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<style>
     header[data-testid="stHeader"] {
         background: transparent !important;
         background-color: transparent !important;
@@ -2597,70 +2549,68 @@ st.markdown("""
         padding: 0px !important;
     }
 
-    .stTabs {
-        overflow: visible !important;
-    }
-    .stTabs [data-baseweb="tab-highlight"],
-    .stTabs [data-baseweb="tab-border"],
-    div[data-baseweb="tab-highlight"],
-    div[data-baseweb="tab-border"] {
+    div[data-testid="stElementContainer"]:has(> div > .hook-tabs-row) {
         display: none !important;
+    }
+    div[data-testid="stElementContainer"]:has(> div > .hook-tabs-row) + div[data-testid="stElementContainer"] {
         height: 0px !important;
-        background: transparent !important;
-        background-color: transparent !important;
-        border: none !important;
-    }
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 14px !important;
-        margin-bottom: 1.25rem !important;
-        padding: 8px 4px !important;
-        height: auto !important;
-        min-height: 68px !important;
+        min-height: 0px !important;
+        margin-top: 0px !important;
+        margin-bottom: -1rem !important;
+        padding: 0px !important;
         overflow: visible !important;
+        position: relative !important;
+        z-index: 30 !important;
+    }
+    div[data-testid="stElementContainer"]:has(> div > .hook-tabs-row) + div[data-testid="stElementContainer"] div[data-testid="stButton"] button {
+        position: absolute !important;
+        top: 4px !important;
+        right: 2px !important;
+        width: 34px !important;
+        min-width: 34px !important;
+        max-width: 34px !important;
+        height: 34px !important;
+        min-height: 34px !important;
+        padding: 0px !important;
+        border-radius: 9px !important;
         background: transparent !important;
-        border: none !important;
-        align-items: center !important;
-        flex-wrap: wrap !important;
-    }
-    .stTabs button[data-baseweb="tab"] {
-        min-height: 54px !important;
-        height: auto !important;
-        padding: 10px 26px !important;
-        background-color: #F9FAFB !important;
-        border-radius: 999px !important;
-        border: 1.5px solid #E5E7EB !important;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04) !important;
-        transition: all 0.25s ease-in-out !important;
-        overflow: visible !important;
-    }
-    .stTabs button[data-baseweb="tab"]:hover {
-        background-color: #F0F9FF !important;
-        border-color: #7DD3FC !important;
-        transform: translateY(-1px) !important;
-        box-shadow: 0 5px 12px rgba(14, 116, 144, 0.10) !important;
-    }
-    .stTabs button[data-baseweb="tab"][aria-selected="true"] {
-        background-color: #E0F2FE !important;
-        border: 2px solid #7DD3FC !important;
-        border-radius: 999px !important;
-        box-shadow: 0 4px 14px rgba(14, 116, 144, 0.14) !important;
-    }
-    .stTabs button[data-baseweb="tab"] [data-testid="stMarkdownContainer"] p,
-    .stTabs button[data-baseweb="tab"] p {
-        font-size: 1.12rem !important;
-        font-weight: 800 !important;
-        color: #4B5563 !important;
-        text-transform: uppercase !important;
-        letter-spacing: 0.4px !important;
-        margin: 0 !important;
+        border: 1px solid var(--fin-border-muted) !important;
+        color: var(--fin-ink) !important;
         display: inline-flex !important;
         align-items: center !important;
-        gap: 8px !important;
-        line-height: 1.2 !important;
+        justify-content: center !important;
     }
-    .stTabs button[data-baseweb="tab"][aria-selected="true"] [data-testid="stMarkdownContainer"] p,
-    .stTabs button[data-baseweb="tab"][aria-selected="true"] p {
-        color: #0C4A6E !important;
+    div[data-testid="stElementContainer"]:has(> div > .hook-tabs-row) + div[data-testid="stElementContainer"] div[data-testid="stButton"] button p {
+        color: var(--fin-ink) !important;
+        font-size: 1.05rem !important;
+        font-weight: 700 !important;
+        margin: 0px !important;
+        line-height: 1 !important;
+    }
+    div[data-testid="stElementContainer"]:has(> div > .hook-tabs-row) + div[data-testid="stElementContainer"] + div[data-testid="stElementContainer"] div[data-baseweb="tab-list"] {
+        flex-wrap: nowrap !important;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        -webkit-overflow-scrolling: touch !important;
+        scrollbar-width: none !important;
+        padding-right: 46px !important;
+        gap: 18px !important;
+    }
+    div[data-testid="stElementContainer"]:has(> div > .hook-tabs-row) + div[data-testid="stElementContainer"] + div[data-testid="stElementContainer"] div[data-baseweb="tab-list"]::-webkit-scrollbar {
+        display: none !important;
+    }
+    button[data-baseweb="tab"] {
+        flex-shrink: 0 !important;
+        white-space: nowrap !important;
+    }
+    button[data-baseweb="tab"] [data-testid="stMarkdownContainer"] p,
+    button[data-baseweb="tab"] p {
+        color: var(--fin-ink) !important;
+        white-space: nowrap !important;
+    }
+    button[data-baseweb="tab"][aria-selected="true"] [data-testid="stMarkdownContainer"] p,
+    button[data-baseweb="tab"][aria-selected="true"] p {
+        color: #DC2626 !important;
     }
 
     div[data-testid="stElementContainer"]:has(> div > .hook-agregar-costo),
@@ -3493,7 +3443,7 @@ with st.sidebar:
         st.rerun()
 
     st.markdown(
-        f"<div style='text-align: center; color: #6B7280; font-size: 0.85rem; margin-top: 8px;'>🕒 "
+        f"<div style='text-align: center; color: var(--fin-muted); font-size: 0.85rem; margin-top: 8px;'>🕒 "
         f"<span id='finapp-last-saved' data-saved-ts='{ultima_act_iso}'>{ultima_act_texto}</span></div>",
         unsafe_allow_html=True,
     )
@@ -3795,6 +3745,14 @@ def _html_gauge_cluster_card(cfg, val_aud, idx=0, super_aud=None):
 
     uid = f"g_{cfg['id']}_{idx}"
     delay_ms = idx * 90
+    _g_dark = _detectar_tema_oscuro()
+    _g_title_col = "#F3F4F6" if _g_dark else "#111827"
+    _g_scale_col = "#CBD5E1" if _g_dark else "#475569"
+    _g_dial_bg = "#161B22" if _g_dark else "#F8FAFC"
+    _g_dial_edge = "#334155" if _g_dark else "#E2E8F0"
+    _g_track = "#262E3B" if _g_dark else "#E2E8F0"
+    _g_tick_maj = "#94A3B8" if _g_dark else "#475569"
+    _g_tick_min = "#475569" if _g_dark else "#CBD5E1"
 
     return f"""
 <!DOCTYPE html>
@@ -3803,24 +3761,13 @@ def _html_gauge_cluster_card(cfg, val_aud, idx=0, super_aud=None):
 <meta charset="utf-8">
 <style>
   :root {{
-    --g-title: #0F172A;
-    --g-scale: #475569;
-    --g-dial-bg: #F8FAFC;
-    --g-dial-edge: #E2E8F0;
-    --g-track: #E2E8F0;
-    --g-tick-maj: #475569;
-    --g-tick-min: #CBD5E1;
-  }}
-  @media (prefers-color-scheme: dark) {{
-    :root {{
-      --g-title: #F3F4F6;
-      --g-scale: #CBD5E1;
-      --g-dial-bg: #161B22;
-      --g-dial-edge: #334155;
-      --g-track: #262E3B;
-      --g-tick-maj: #94A3B8;
-      --g-tick-min: #475569;
-    }}
+    --g-title: {_g_title_col};
+    --g-scale: {_g_scale_col};
+    --g-dial-bg: {_g_dial_bg};
+    --g-dial-edge: {_g_dial_edge};
+    --g-track: {_g_track};
+    --g-tick-maj: {_g_tick_maj};
+    --g-tick-min: {_g_tick_min};
   }}
   html[data-theme="dark"] {{
     --g-title: #F3F4F6;
@@ -3911,12 +3858,23 @@ def _html_gauge_cluster_card(cfg, val_aud, idx=0, super_aud=None):
   <script>
     (function() {{
       try {{
-        const pApp = window.parent.document.querySelector('[data-testid="stAppViewContainer"]') || window.parent.document.body;
-        const bg = window.parent.getComputedStyle(pApp).backgroundColor;
-        const m = bg && bg.match(/\d+/g);
-        if (m && m.length >= 3) {{
-          const lum = (0.299 * +m[0] + 0.587 * +m[1] + 0.114 * +m[2]);
-          document.documentElement.setAttribute('data-theme', lum < 128 ? 'dark' : 'light');
+        const cands = [
+          window.parent.document.querySelector('[data-testid="stAppViewContainer"]'),
+          window.parent.document.querySelector('.stApp'),
+          window.parent.document.body
+        ];
+        for (const el of cands) {{
+          if (!el) continue;
+          const bg = window.parent.getComputedStyle(el).backgroundColor || '';
+          const m = bg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?/i);
+          if (m) {{
+            const alpha = m[4] !== undefined ? parseFloat(m[4]) : 1.0;
+            if (alpha > 0.1) {{
+              const lum = (0.299 * +m[1] + 0.587 * +m[2] + 0.114 * +m[3]);
+              document.documentElement.setAttribute('data-theme', lum < 128 ? 'dark' : 'light');
+              break;
+            }}
+          }}
         }}
       }} catch (e) {{}}
 
@@ -3982,15 +3940,15 @@ def _html_odometer_box(val_aud):
 
 # ----------------- MAIN TABS (REORDERABLE) -----------------
 DEFAULT_TAB_ORDER = [
-    "⚙️ DASHBOARD",
+    "DASHBOARD",
     "📊 COSTS & INCOME",
     "💼 TOTAL NET WORTH",
     "⚡ LIVE CASH FLOW"
 ]
 
 orden_tabs_guardado = datos.get("tab_order", DEFAULT_TAB_ORDER)
-if isinstance(orden_tabs_guardado, list) and "🎛️ DASHBOARD" in orden_tabs_guardado:
-    orden_tabs_guardado = ["⚙️ DASHBOARD" if t == "🎛️ DASHBOARD" else t for t in orden_tabs_guardado]
+if isinstance(orden_tabs_guardado, list) and any(t in ("🎛️ DASHBOARD", "⚙️ DASHBOARD") for t in orden_tabs_guardado):
+    orden_tabs_guardado = ["DASHBOARD" if t in ("🎛️ DASHBOARD", "⚙️ DASHBOARD") else t for t in orden_tabs_guardado]
     datos["tab_order"] = orden_tabs_guardado
     guardar_datos(datos, registrar_cambio=False)
 if (
@@ -4000,6 +3958,36 @@ if (
 ):
     orden_tabs_guardado = list(DEFAULT_TAB_ORDER)
 
+_idx_dash_tab = orden_tabs_guardado.index("DASHBOARD") + 1
+_svg_steering = (
+    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' "
+    "fill='none' stroke='black' stroke-width='2.1' stroke-linecap='round' stroke-linejoin='round'%3E"
+    "%3Ccircle cx='12' cy='12' r='9'/%3E%3Ccircle cx='12' cy='12' r='2.3'/%3E"
+    "%3Cline x1='3.5' y1='10.5' x2='9.8' y2='11.6'/%3E"
+    "%3Cline x1='20.5' y1='10.5' x2='14.2' y2='11.6'/%3E"
+    "%3Cline x1='12' y1='14.3' x2='12' y2='21'/%3E%3C/svg%3E"
+)
+st.markdown(f"""
+<style>
+    div[data-baseweb="tab-list"] button[data-baseweb="tab"]:nth-of-type({_idx_dash_tab}) p {{
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 7px !important;
+    }}
+    div[data-baseweb="tab-list"] button[data-baseweb="tab"]:nth-of-type({_idx_dash_tab}) p::before {{
+        content: "";
+        display: inline-block;
+        width: 1.05em;
+        height: 1.05em;
+        flex-shrink: 0;
+        background-color: currentColor;
+        -webkit-mask: url("{_svg_steering}") no-repeat center / contain;
+        mask: url("{_svg_steering}") no-repeat center / contain;
+    }}
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown("<div class='hook-tabs-row'></div>", unsafe_allow_html=True)
 if st.button("⇄", key="btn_cycle_tabs_order", help="Switch tab order"):
     nuevo_orden = orden_tabs_guardado[1:] + orden_tabs_guardado[:1]
     datos["tab_order"] = nuevo_orden
@@ -4008,7 +3996,7 @@ if st.button("⇄", key="btn_cycle_tabs_order", help="Switch tab order"):
 
 tabs_creadas = st.tabs(orden_tabs_guardado)
 mapa_tabs = dict(zip(orden_tabs_guardado, tabs_creadas))
-pestana0 = mapa_tabs["⚙️ DASHBOARD"]
+pestana0 = mapa_tabs["DASHBOARD"]
 pestana1 = mapa_tabs["📊 COSTS & INCOME"]
 pestana2 = mapa_tabs["💼 TOTAL NET WORTH"]
 pestana3 = mapa_tabs["⚡ LIVE CASH FLOW"]
@@ -4573,7 +4561,7 @@ with pestana1:
             if modo_grafico.startswith("By Category"):
                 _cmap_c = {row_v: PALETA_COSTOS[idx_v % len(PALETA_COSTOS)] for idx_v, row_v in enumerate(tabla_c[titulo_col_c])}
                 st.dataframe(
-                    tabla_c.style.map(lambda v: f"color: {_cmap_c.get(v, '#111827')}; font-weight: 700;", subset=[titulo_col_c]),
+                    tabla_c.style.map(lambda v: f"color: {_cmap_c.get(v, '#F3F4F6' if _detectar_tema_oscuro() else '#111827')}; font-weight: 700;", subset=[titulo_col_c]),
                     use_container_width=True,
                     hide_index=True,
                 )
@@ -4612,7 +4600,7 @@ with pestana1:
             if modo_grafico.startswith("By Category"):
                 _cmap_i = {row_v: PALETA_INGRESOS[idx_v % len(PALETA_INGRESOS)] for idx_v, row_v in enumerate(tabla_i[titulo_col_i])}
                 st.dataframe(
-                    tabla_i.style.map(lambda v: f"color: {_cmap_i.get(v, '#111827')}; font-weight: 700;", subset=[titulo_col_i]),
+                    tabla_i.style.map(lambda v: f"color: {_cmap_i.get(v, '#F3F4F6' if _detectar_tema_oscuro() else '#111827')}; font-weight: 700;", subset=[titulo_col_i]),
                     use_container_width=True,
                     hide_index=True,
                 )
