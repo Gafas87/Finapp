@@ -2823,8 +2823,8 @@ st.markdown("""
         align-items: center !important;
         justify-content: center !important;
         gap: 8px !important;
-        margin-top: -10px !important;
-        margin-bottom: 6px !important;
+        margin-top: 0px !important;
+        margin-bottom: 2px !important;
     }
     div[data-testid="stElementContainer"]:has(> div > .hook-odo-row) + div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
         min-width: 0 !important;
@@ -3940,15 +3940,15 @@ def _html_odometer_box(val_aud):
 
 # ----------------- MAIN TABS (REORDERABLE) -----------------
 DEFAULT_TAB_ORDER = [
-    "DASHBOARD",
+    "🕹️ DASHBOARD",
     "📊 COSTS & INCOME",
     "💼 TOTAL NET WORTH",
     "⚡ LIVE CASH FLOW"
 ]
 
 orden_tabs_guardado = datos.get("tab_order", DEFAULT_TAB_ORDER)
-if isinstance(orden_tabs_guardado, list) and any(t in ("🎛️ DASHBOARD", "⚙️ DASHBOARD") for t in orden_tabs_guardado):
-    orden_tabs_guardado = ["DASHBOARD" if t in ("🎛️ DASHBOARD", "⚙️ DASHBOARD") else t for t in orden_tabs_guardado]
+if isinstance(orden_tabs_guardado, list) and any(t in ("🎛️ DASHBOARD", "⚙️ DASHBOARD", "DASHBOARD") for t in orden_tabs_guardado):
+    orden_tabs_guardado = ["🕹️ DASHBOARD" if t in ("🎛️ DASHBOARD", "⚙️ DASHBOARD", "DASHBOARD") else t for t in orden_tabs_guardado]
     datos["tab_order"] = orden_tabs_guardado
     guardar_datos(datos, registrar_cambio=False)
 if (
@@ -3957,35 +3957,6 @@ if (
     or len(orden_tabs_guardado) != len(DEFAULT_TAB_ORDER)
 ):
     orden_tabs_guardado = list(DEFAULT_TAB_ORDER)
-
-_idx_dash_tab = orden_tabs_guardado.index("DASHBOARD") + 1
-_svg_steering = (
-    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' "
-    "fill='none' stroke='black' stroke-width='2.1' stroke-linecap='round' stroke-linejoin='round'%3E"
-    "%3Ccircle cx='12' cy='12' r='9'/%3E%3Ccircle cx='12' cy='12' r='2.3'/%3E"
-    "%3Cline x1='3.5' y1='10.5' x2='9.8' y2='11.6'/%3E"
-    "%3Cline x1='20.5' y1='10.5' x2='14.2' y2='11.6'/%3E"
-    "%3Cline x1='12' y1='14.3' x2='12' y2='21'/%3E%3C/svg%3E"
-)
-st.markdown(f"""
-<style>
-    div[data-baseweb="tab-list"] button[data-baseweb="tab"]:nth-of-type({_idx_dash_tab}) p {{
-        display: inline-flex !important;
-        align-items: center !important;
-        gap: 7px !important;
-    }}
-    div[data-baseweb="tab-list"] button[data-baseweb="tab"]:nth-of-type({_idx_dash_tab}) p::before {{
-        content: "";
-        display: inline-block;
-        width: 1.05em;
-        height: 1.05em;
-        flex-shrink: 0;
-        background-color: currentColor;
-        -webkit-mask: url("{_svg_steering}") no-repeat center / contain;
-        mask: url("{_svg_steering}") no-repeat center / contain;
-    }}
-</style>
-""", unsafe_allow_html=True)
 
 st.markdown("<div class='hook-tabs-row'></div>", unsafe_allow_html=True)
 if st.button("⇄", key="btn_cycle_tabs_order", help="Switch tab order"):
@@ -3996,7 +3967,7 @@ if st.button("⇄", key="btn_cycle_tabs_order", help="Switch tab order"):
 
 tabs_creadas = st.tabs(orden_tabs_guardado)
 mapa_tabs = dict(zip(orden_tabs_guardado, tabs_creadas))
-pestana0 = mapa_tabs["DASHBOARD"]
+pestana0 = mapa_tabs["🕹️ DASHBOARD"]
 pestana1 = mapa_tabs["📊 COSTS & INCOME"]
 pestana2 = mapa_tabs["💼 TOTAL NET WORTH"]
 pestana3 = mapa_tabs["⚡ LIVE CASH FLOW"]
@@ -4023,10 +3994,6 @@ with pestana0:
             sup_extra = dash_balances.get("super", 0.0) if g_cfg.get("is_investments") else None
 
             with cols_dash[col_i]:
-                components.html(
-                    _html_gauge_cluster_card(g_cfg, val_actual, idx=g_idx, super_aud=sup_extra),
-                    height=188,
-                )
                 st.markdown("<div class='hook-odo-row' style='display:none;'></div>", unsafe_allow_html=True)
                 c_gear, c_odo = st.columns([0.85, 3.15], gap="small")
                 with c_odo:
@@ -4059,6 +4026,10 @@ with pestana0:
                             g_cfg["opt_end"] = int(new_o2)
                             guardar_datos(datos, registrar_cambio=False)
                             st.rerun()
+                components.html(
+                    _html_gauge_cluster_card(g_cfg, val_actual, idx=g_idx, super_aud=sup_extra),
+                    height=188,
+                )
                 if g_cfg.get("is_investments") and sup_extra is not None:
                     _sup_i = max(0, int(round(sup_extra)))
                     _tot_i = max(0, int(round(val_actual))) + _sup_i
@@ -4066,6 +4037,12 @@ with pestana0:
                         f"<div class='finapp-inv-sub'>SUPER <b>{_sup_i:,} AUD</b> &nbsp;·&nbsp; TOTAL <b>{_tot_i:,} AUD</b></div>",
                         unsafe_allow_html=True,
                     )
+                st.markdown(
+                    "<div style='height: 48px; display: flex; align-items: center;'>"
+                    "<div style='width: 100%; border-top: 1px solid var(--fin-border-muted); opacity: 0.4;'></div>"
+                    "</div>",
+                    unsafe_allow_html=True,
+                )
 
 
     tnw_total_aud = sum(
@@ -4688,13 +4665,11 @@ with pestana2:
             "Active_Flag": esta_activo
         })
 
+    if "tab2_sync_binance_live" not in st.session_state:
+        st.session_state["tab2_sync_binance_live"] = True
     bn_key, bn_sec, bn_r_url, bn_r_sec = _obtener_binance_keys()
     if bn_key and bn_sec:
-        usar_binance_live = st.checkbox(
-            "🟡 Sync Live Binance (Spot + Simple Earn)",
-            value=True,
-            key="tab2_sync_binance_live",
-        )
+        usar_binance_live = bool(st.session_state.get("tab2_sync_binance_live", True))
         if usar_binance_live:
             bn_rows, bn_err = obtener_binance_portfolio(bn_key, bn_sec, usd_to_aud, relay_url=bn_r_url, relay_secret=bn_r_sec)
             if bn_err:
@@ -5329,6 +5304,12 @@ with pestana2:
                 """, unsafe_allow_html=True)
 
             st.dataframe(tabla_d, use_container_width=True, hide_index=True)
+
+    if bn_key and bn_sec:
+        st.checkbox(
+            "🟡 Sync Live Binance (Spot + Simple Earn)",
+            key="tab2_sync_binance_live",
+        )
 
 
 # =========================================================================
