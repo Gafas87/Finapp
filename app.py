@@ -714,13 +714,11 @@ PALETA_PASTEL = [
 ]
 
 PALETA_COSTOS = [
-    "#DC2626", "#EA580C", "#991B1B", "#D97706", "#B91C1C",
-    "#C2410C", "#E11D48", "#B45309", "#7F1D1D", "#F97316"
+    "#DC2626", "#F97316", "#EAB308", "#EC4899", "#7C3AED", "#92400E"
 ]
 
 PALETA_INGRESOS = [
-    "#16A34A", "#15803D", "#059669", "#166534", "#0D9488",
-    "#22C55E", "#14532D", "#047857"
+    "#16A34A", "#0D9488", "#0284C7", "#84CC16", "#059669", "#06B6D4"
 ]
 
 ICONOS_DISPONIBLES = [
@@ -1452,6 +1450,8 @@ def crear_torta_2d(df, col_valores, col_nombres, tamano="mediano", usar_minuscul
 
     _pal_usar = paleta if paleta else PALETA_PASTEL
     colores = [_pal_usar[i % len(_pal_usar)] for i in range(n)]
+    colores_claros = {"#EAB308", "#84CC16", "#FACC15", "#FDE047"}
+    inside_text_cols = ["#111827" if c.upper() in colores_claros else "#FFFFFF" for c in colores]
 
     textos_torta = [
         f"{nom}<br>{((v / total) * 100):.1f}%"
@@ -1497,9 +1497,14 @@ def crear_torta_2d(df, col_valores, col_nombres, tamano="mediano", usar_minuscul
         insidetextorientation="horizontal",
         pull=[0.012] * n,
         automargin=True,
-        textfont=dict(
+        insidetextfont=dict(
             size=tam_fuente,
-            color="#1F2937",
+            color=inside_text_cols,
+            family="Arial, sans-serif"
+        ),
+        outsidetextfont=dict(
+            size=tam_fuente,
+            color="#111827",
             family="Arial, sans-serif"
         ),
         marker=dict(
@@ -2771,12 +2776,16 @@ st.markdown("""
         color: #111827 !important;
         margin-bottom: 0.3rem;
     }
-    [data-testid="stSidebar"] * {
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+    [data-testid="stSidebar"] [data-testid="stIconMaterial"],
+    [data-testid="stSidebar"] .material-symbols-rounded,
+    [data-testid="stSidebar"] .material-icons,
+    [data-testid="stIconMaterial"] {
+        font-family: 'Material Symbols Rounded', 'Material Icons' !important;
     }
     [data-testid="stSidebar"] p,
     [data-testid="stSidebar"] label,
     [data-testid="stSidebar"] summary {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
         font-size: 0.90rem !important;
         font-weight: 600 !important;
         color: #111827 !important;
@@ -2789,7 +2798,8 @@ st.markdown("""
     .kpi-sub {
         font-size: 0.95rem;
         font-weight: 600;
-        opacity: 0.9;
+        color: #111827 !important;
+        opacity: 1;
         margin-top: 0.45rem;
     }
     .col-header {
@@ -3221,19 +3231,27 @@ with st.sidebar:
         elif not eventos_cal:
             st.caption("No upcoming events in the next 30 days.")
         else:
+            import re as _re_cp
             for ev in eventos_cal[:5]:
                 amt = ev["amount_aud"]
+                clean_title = _re_cp.sub(
+                    r'[+-]?\s*(?:AUD\s*)?\$\s*[0-9][0-9,]*(?:\.[0-9]{1,2})?',
+                    '',
+                    str(ev['title']),
+                    flags=_re_cp.IGNORECASE,
+                ).strip(" -–·") or str(ev['title'])
+                urg_col = "#DC2626" if int(ev.get("days_left", 99)) <= 7 else "#4B5563"
                 if amt is not None:
                     amt_str = f"+${amt:,.0f}" if amt > 0 else f"-${abs(amt):,.0f}"
-                    color_ev = "#166534" if amt > 0 else "#991B1B"
-                    badge = f"<span style='color:{color_ev}; font-weight:700;'>{amt_str}</span>"
+                    amt_html = f"<span style='color:{urg_col}; font-weight:700; white-space:nowrap;'>{amt_str}</span>"
                 else:
-                    badge = ""
+                    amt_html = ""
                 st.markdown(
                     f"<div style='background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; "
                     f"padding:7px 10px; margin-bottom:6px; font-size:0.84rem; line-height:1.35;'>"
-                    f"<span style='font-weight:600; color:#111827;'>{ev['title']}</span> {badge}<br>"
-                    f"<span style='color:#64748B; font-weight:400;'>{ev['date_str']} · {ev['when']}</span></div>",
+                    f"<div style='display:flex; justify-content:space-between; align-items:center; gap:8px;'>"
+                    f"<span style='font-weight:700; color:{urg_col};'>{clean_title}</span>{amt_html}</div>"
+                    f"<div style='color:#64748B; font-weight:400; margin-top:2px;'>{ev['date_str']} · {ev['when']}</div></div>",
                     unsafe_allow_html=True,
                 )
             if len(eventos_cal) > 5:
@@ -3331,30 +3349,20 @@ with st.sidebar:
     )
 
 if st.session_state.confirmar_cierre:
-    st.markdown("""
-    <div style="background: linear-gradient(145deg, #F0F9FF 0%, #F3E8FF 100%);
-                border: 2px solid #7E22CE; border-radius: 18px; padding: 20px; margin-bottom: 16px;
-                box-shadow: 0 8px 24px rgba(126, 34, 206, 0.14);">
-        <h3 style="color: #0C4A6E; margin-top: 0; margin-bottom: 8px;">✅ Your changes have been saved automatically!</h3>
-        <p style="font-size: 1.15rem; color: #374151; font-weight: 700; margin-bottom: 0;">
-            Would you like to download a spreadsheet backup before logging out?
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    col_dl1, col_dl2 = st.columns(2, gap="medium")
-    with col_dl1:
-        st.download_button(
-            label="📥 YES, DOWNLOAD & LOG OUT",
-            data=generar_excel_bytes(datos, usd_to_aud, cotizaciones),
-            file_name=f"Finapp_{stamp_archivo}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True,
-            on_click=finalizar_sesion
-        )
-    with col_dl2:
-        if st.button("🚪 NO, LOG OUT", use_container_width=True):
+    st.markdown(
+        "<div style='background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; "
+        "padding:10px 14px; margin-bottom:10px; color:#1F2937; font-size:0.95rem; font-weight:600;'>"
+        "✅ Changes saved</div>",
+        unsafe_allow_html=True,
+    )
+    col_lo1, col_lo2 = st.columns(2, gap="small")
+    with col_lo1:
+        if st.button("Log Out", key="btn_confirm_logout", use_container_width=True):
             finalizar_sesion()
+            st.rerun()
+    with col_lo2:
+        if st.button("Cancel", key="btn_cancel_logout", use_container_width=True):
+            st.session_state.confirmar_cierre = False
             st.rerun()
 
 
@@ -3983,15 +3991,15 @@ with pestana1:
     if saldo_neto > 0:
         clase_saldo = "metric-card-ingreso"
         carita = "😊"
-        sub_saldo = "Positive result (Gain / Savings)"
+        sub_saldo = "Positive savings"
     elif saldo_neto == 0 or (total_ingresos > 0 and abs(saldo_neto) < 0.10 * total_ingresos):
         clase_saldo = "metric-card-amarillo-mate"
         carita = "😐"
-        sub_saldo = "Break-even (No gain or loss)" if saldo_neto == 0 else "Mild weekly deficit (< 10% of income)"
+        sub_saldo = "Break-even" if saldo_neto == 0 else "Facing losses"
     else:
         clase_saldo = "metric-card-costo"
         carita = "😟"
-        sub_saldo = "Negative result (Weekly deficit ≥ 10%)"
+        sub_saldo = "Facing losses"
 
     col_kpi1, col_kpi2, col_kpi3 = st.columns(3, gap="medium")
     with col_kpi1:
@@ -4418,7 +4426,15 @@ with pestana1:
             tabla_c.columns = [titulo_col_c, "Subtotal (AUD)", "% of Total"]
             tabla_c["Subtotal (AUD)"] = tabla_c["Subtotal (AUD)"].apply(lambda x: f"${x:,.0f} AUD")
             tabla_c["% of Total"] = tabla_c["% of Total"].apply(lambda x: f"{x:.1f}%")
-            st.dataframe(tabla_c, use_container_width=True, hide_index=True)
+            if modo_grafico.startswith("By Category"):
+                _cmap_c = {row_v: PALETA_COSTOS[idx_v % len(PALETA_COSTOS)] for idx_v, row_v in enumerate(tabla_c[titulo_col_c])}
+                st.dataframe(
+                    tabla_c.style.map(lambda v: f"color: {_cmap_c.get(v, '#111827')}; font-weight: 700;", subset=[titulo_col_c]),
+                    use_container_width=True,
+                    hide_index=True,
+                )
+            else:
+                st.dataframe(tabla_c, use_container_width=True, hide_index=True)
         else:
             st.info("No active costs to display.")
 
@@ -4449,7 +4465,15 @@ with pestana1:
             tabla_i.columns = [titulo_col_i, "Subtotal (AUD)", "% of Total"]
             tabla_i["Subtotal (AUD)"] = tabla_i["Subtotal (AUD)"].apply(lambda x: f"${x:,.0f} AUD")
             tabla_i["% of Total"] = tabla_i["% of Total"].apply(lambda x: f"{x:.1f}%")
-            st.dataframe(tabla_i, use_container_width=True, hide_index=True)
+            if modo_grafico.startswith("By Category"):
+                _cmap_i = {row_v: PALETA_INGRESOS[idx_v % len(PALETA_INGRESOS)] for idx_v, row_v in enumerate(tabla_i[titulo_col_i])}
+                st.dataframe(
+                    tabla_i.style.map(lambda v: f"color: {_cmap_i.get(v, '#111827')}; font-weight: 700;", subset=[titulo_col_i]),
+                    use_container_width=True,
+                    hide_index=True,
+                )
+            else:
+                st.dataframe(tabla_i, use_container_width=True, hide_index=True)
         else:
             st.info("No active income to display.")
 
