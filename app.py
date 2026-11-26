@@ -118,17 +118,21 @@ def _parse_ics_dt(val_str):
 def _extraer_monto_evento(texto):
     import re
     t = texto or ""
-    m = re.search(r'([+-])?\s*(?:AUD\s*)?\$\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)', t, re.IGNORECASE)
+    # Match explicit signed amount (+450, -$450, +$450) or $-prefixed amount ($450)
+    m = re.search(r'([+-])\s*(?:AUD\s*)?\$?\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)', t, re.IGNORECASE)
+    if not m:
+        m = re.search(r'()(?:AUD\s*)?\$\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)', t, re.IGNORECASE)
     if not m:
         return None
-    signo = m.group(1) or ""
+    signo = (m.group(1) or "").strip()
     num = float(m.group(2).replace(",", ""))
     if signo == "-":
         return -num
     if signo == "+":
         return num
     low = t.lower()
-    if any(k in low for k in ["payday", "salary", "wage", "income", "deposit", "refund", "rent from", "contribution"]):
+    is_house_cost = any(k in low for k in ["house rent", "wifi", "charge", "bill", "electricity", "water", "gas", "internet", "rego", "insurance"])
+    if not is_house_cost and any(k in low for k in ["payday", "salary", "wage", "income", "deposit", "refund", "rent from", "contribution", "andy", "juan"]):
         return num
     return -num
 
@@ -499,7 +503,7 @@ def obtener_binance_portfolio(api_key, api_secret, usd_to_aud_rate=1.55, refresh
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def _listar_modelos_gemini(api_key):
-    modelos = ["gemini-2.5-flash", "gemini-2.0-flash"]
+    modelos = ["gemini-2.5-flash-lite", "gemini-2.0-flash-lite", "gemini-2.5-flash", "gemini-2.0-flash"]
     try:
         r = requests.get(
             "https://generativelanguage.googleapis.com/v1beta/models",
@@ -507,16 +511,21 @@ def _listar_modelos_gemini(api_key):
             timeout=10,
         )
         if r.status_code == 200:
-            encontrados = []
+            lites, flashes = [], []
             for m in r.json().get("models", []):
                 nombre = (m.get("name") or "").replace("models/", "")
                 metodos = m.get("supportedGenerationMethods", [])
-                if "generateContent" in metodos and "flash" in nombre.lower() and "image" not in nombre.lower() and "tts" not in nombre.lower():
-                    encontrados.append(nombre)
-            if encontrados:
-                # Prefer newest flash models first, keeping fallbacks
-                encontrados.sort(reverse=True)
-                return encontrados + [x for x in modelos if x not in encontrados]
+                nl = nombre.lower()
+                if "generateContent" in metodos and "flash" in nl and "image" not in nl and "tts" not in nl:
+                    if "lite" in nl:
+                        lites.append(nombre)
+                    else:
+                        flashes.append(nombre)
+            lites.sort(reverse=True)
+            flashes.sort(reverse=True)
+            combinados = lites + flashes
+            if combinados:
+                return combinados + [x for x in modelos if x not in combinados]
     except Exception:
         pass
     return modelos
@@ -529,12 +538,12 @@ def consultar_chatbot_finanzas(pregunta, historial, contexto_financiero, api_key
     system_prompt = (
         "You are Finapp AI Advisor, Julian's personal Australian finance assistant. "
         "All amounts are in AUD unless explicitly noted. Be concise, practical, and accurate. "
-        "Use the live financial snapshot below to answer questions with exact numbers.\n\n"
+        "Use the pre-calculated figures and live snapshot below to answer with exact numbers.\n\n"
         f"{contexto_financiero}"
     )
 
     contents = []
-    for msg in historial[-8:]:
+    for msg in historial[-4:]:
         role = "user" if msg["role"] == "user" else "model"
         contents.append({"role": role, "parts": [{"text": msg["content"]}]})
     contents.append({"role": "user", "parts": [{"text": pregunta}]})
@@ -542,18 +551,20 @@ def consultar_chatbot_finanzas(pregunta, historial, contexto_financiero, api_key
     payload = {
         "system_instruction": {"parts": [{"text": system_prompt}]},
         "contents": contents,
-        "generationConfig": {"temperature": 0.3, "maxOutputTokens": 700},
+        "generationConfig": {"temperature": 0.3, "maxOutputTokens": 600},
     }
 
     ultimo_error = "Could not reach Gemini API."
-    for modelo in _listar_modelos_gemini(api_key)[:4]:
+    for modelo in _listar_modelos_gemini(api_key)[:3]:
         try:
-            resp = requests.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent",
-                headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
-                json=payload,
-                timeout=20,
-            )
+            url_m = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
+            hdrs_m = {"Content-Type": "application/json", "x-goog-api-key": api_key}
+            resp = requests.post(url_m, headers=hdrs_m, json=payload, timeout=20)
+            if resp.status_code == 429:
+                time.sleep(2.0)
+                resp = requests.post(url_m, headers=hdrs_m, json=payload, timeout=20)
+                if resp.status_code == 429:
+                    return "AI limit reached, try again in a minute."
             if resp.status_code == 200:
                 data = resp.json()
                 cands = data.get("candidates", [])
@@ -566,7 +577,7 @@ def consultar_chatbot_finanzas(pregunta, historial, contexto_financiero, api_key
                 ultimo_error = f"Model {modelo} unavailable (404)."
                 continue
             else:
-                ultimo_error = f"Gemini API error ({resp.status_code}): {resp.text[:180]}"
+                ultimo_error = "AI service temporarily unavailable. Please try again shortly."
                 break
         except Exception as e:
             ultimo_error = f"Connection error: {e}"
@@ -686,7 +697,7 @@ def clasificar_transaccion_up(tx, own_account_ids=None, own_account_names=None):
         tag = "💳 Outgoing Expense"
 
     return {
-        "Date": dt_syd.strftime("%Y-%m-%d %H:%M"),
+        "Date": dt_syd.strftime("%d/%m/%Y %H:%M"),
         "Date_Sort": dt_syd,
         "Description": desc or "Transaction",
         "Note": msg,
@@ -696,6 +707,99 @@ def clasificar_transaccion_up(tx, own_account_ids=None, own_account_names=None):
         "is_internal_up": is_internal_up,
         "needs_review": needs_review,
     }
+
+
+def calcular_resumen_cashflow_up(df_txs, date_from=None, date_to=None, search_text="", hoy_date=None):
+    hoy_d = hoy_date or datetime.now(TZ_SYDNEY).date()
+    if df_txs is None or df_txs.empty:
+        return pd.DataFrame(), {
+            "count": 0, "total": 0.0, "avg_tx": 0.0,
+            "avg_day": 0.0, "avg_week": 0.0, "avg_month": 0.0,
+            "d_from": date_from or hoy_d, "d_to": date_to or hoy_d, "n_days": 1,
+        }
+    df_m = df_txs.copy()
+    df_m["_dt_date"] = pd.to_datetime(df_m["Date_Sort"]).dt.date
+    if date_from is not None:
+        df_m = df_m[df_m["_dt_date"] >= date_from]
+    if date_to is not None:
+        df_m = df_m[df_m["_dt_date"] <= date_to]
+    if search_text and search_text.strip():
+        q_low = search_text.strip().lower()
+        df_m = df_m[
+            df_m["Description"].str.lower().str.contains(q_low, na=False)
+            | df_m["Note"].str.lower().str.contains(q_low, na=False)
+            | df_m["Tag"].str.lower().str.contains(q_low, na=False)
+        ]
+
+    d_to = date_to if date_to is not None else hoy_d
+    if date_from is not None:
+        d_from = date_from
+    elif not df_m.empty:
+        d_from = min(df_m["_dt_date"])
+    else:
+        d_from = d_to
+
+    n_days = max(1, (d_to - d_from).days + 1)
+    n_weeks = n_days / 7.0
+    n_months = n_days / 30.4375
+    n_tx = int(len(df_m))
+    total = float(df_m["Amount (AUD)"].sum()) if n_tx > 0 else 0.0
+
+    return df_m, {
+        "count": n_tx,
+        "total": total,
+        "avg_tx": (total / n_tx) if n_tx > 0 else 0.0,
+        "avg_day": total / n_days,
+        "avg_week": total / n_weeks,
+        "avg_month": total / n_months,
+        "d_from": d_from,
+        "d_to": d_to,
+        "n_days": n_days,
+    }
+
+
+def calcular_top_tags_up(df_period, mode="Costs", date_from=None, date_to=None, hoy_date=None):
+    hoy_d = hoy_date or datetime.now(TZ_SYDNEY).date()
+    if df_period is None or df_period.empty:
+        return pd.DataFrame(), {"total": 0.0, "avg_week": 0.0, "avg_month": 0.0, "count": 0}
+
+    df_t = df_period.copy()
+    if "_dt_date" not in df_t.columns:
+        df_t["_dt_date"] = pd.to_datetime(df_t["Date_Sort"]).dt.date
+
+    d_to = date_to if date_to is not None else hoy_d
+    d_from = date_from if date_from is not None else min(df_t["_dt_date"])
+    n_days = max(1, (d_to - d_from).days + 1)
+    n_weeks = n_days / 7.0
+    n_months = n_days / 30.4375
+
+    if mode == "Costs":
+        df_t = df_t[df_t["Amount (AUD)"] < 0].copy()
+        df_t["_mag"] = df_t["Amount (AUD)"].abs()
+    else:
+        df_t = df_t[df_t["Amount (AUD)"] > 0].copy()
+        df_t["_mag"] = df_t["Amount (AUD)"]
+
+    if df_t.empty:
+        return pd.DataFrame(), {"total": 0.0, "avg_week": 0.0, "avg_month": 0.0, "count": 0}
+
+    grp = df_t.groupby("Tag", as_index=False).agg(
+        Total=("_mag", "sum"),
+        Count=("_mag", "count"),
+    )
+    grand_tot = float(grp["Total"].sum()) or 1.0
+    grp["Avg_Week"] = grp["Total"] / n_weeks
+    grp["Avg_Month"] = grp["Total"] / n_months
+    grp["Share_Pct"] = (grp["Total"] / grand_tot) * 100.0
+    grp = grp.sort_values("Avg_Month", ascending=False).reset_index(drop=True)
+
+    tot_row = {
+        "total": float(grp["Total"].sum()),
+        "avg_week": float(grp["Total"].sum()) / n_weeks,
+        "avg_month": float(grp["Total"].sum()) / n_months,
+        "count": int(grp["Count"].sum()),
+    }
+    return grp, tot_row
 
 
 PALETA_PASTEL = [
@@ -2356,74 +2460,176 @@ def enviar_codigo_por_celular(telefono_limpio, codigo, usuario_actual, datos):
 
 
 # ----------------- EXTERNAL MARKET QUOTES (ALL CONVERTED TO AUD) -----------------
-@st.cache_data(ttl=180)
-def obtener_cotizaciones(simbolos_acciones, simbolos_cripto, simbolos_bonos=()):
-    cotiz = {
-        "usd_to_aud": 1.53,
-        "BTC": 82000.0,
-        "ETH": 2600.0,
-        "USDT": 1.0,
-        "SOL": 150.0,
-        "BNB": 580.0,
-        "ADA": 0.75,
-        "XRP": 1.10,
-        "DOT": 6.50,
-        "DOGE": 0.22,
-        "AAPL": 230.0,
-        "KO": 68.0,
-        "MELI": 2050.0,
-        "SPY": 580.0,
-        "MSFT": 420.0,
-        "GOOGL": 175.0,
-        "AMZN": 200.0,
-        "TSLA": 250.0,
-        "NVDA": 135.0,
-        "YPFD": 28.0
+COINGECKO_ID_MAP = {
+    "BTC": "bitcoin",
+    "ETH": "ethereum",
+    "SOL": "solana",
+    "BNB": "binancecoin",
+    "ADA": "cardano",
+    "XRP": "ripple",
+    "DOT": "polkadot",
+    "DOGE": "dogecoin",
+    "AVAX": "avalanche-2",
+    "LINK": "chainlink",
+    "MATIC": "matic-network",
+    "POL": "polygon-ecosystem-token",
+    "LTC": "litecoin",
+    "UNI": "uniswap",
+    "ATOM": "cosmos",
+    "SUI": "sui",
+    "TON": "the-open-network",
+    "SHIB": "shiba-inu",
+    "PEPE": "pepe",
+    "ARB": "arbitrum",
+    "OP": "optimism",
+    "NEAR": "near",
+    "APT": "aptos",
+    "TRX": "tron",
+    "BCH": "bitcoin-cash",
+    "XLM": "stellar",
+}
+
+
+@st.cache_data(ttl=55, show_spinner=False)
+def _fetch_live_quotes_uncached(simbolos_acciones, simbolos_cripto, simbolos_bonos=()):
+    cotiz = {}
+    failed_syms = []
+    fx_ok = False
+
+    # 1. Live USD -> AUD exchange rate
+    for fx_url, fx_path in [
+        ("https://open.er-api.com/v6/latest/USD", ("rates", "AUD")),
+        ("https://api.frankfurter.app/latest?from=USD&to=AUD", ("rates", "AUD")),
+    ]:
+        try:
+            r_fx = requests.get(fx_url, timeout=4)
+            if r_fx.status_code == 200:
+                rate = r_fx.json().get(fx_path[0], {}).get(fx_path[1])
+                if rate and float(rate) > 0:
+                    cotiz["usd_to_aud"] = float(rate)
+                    fx_ok = True
+                    break
+        except Exception:
+            pass
+
+    # 2. Batched Crypto Quotes (Binance Vision public API -> CoinGecko batched fallback)
+    lista_c = sorted({c.upper().strip() for c in (["BTC", "ETH", "SOL", "BNB"] + list(simbolos_cripto)) if c and c.strip()})
+    pending_c = []
+    for c_up in lista_c:
+        if c_up in ("USDT", "USDC", "DAI", "BUSD", "FDUSD"):
+            cotiz[c_up] = 1.0
+        else:
+            pending_c.append(c_up)
+
+    if pending_c:
+        pairs_json = json.dumps([f"{c}USDT" for c in pending_c], separators=(",", ":"))
+        for b_url in (
+            f"https://data-api.binance.vision/api/v3/ticker/price?symbols={pairs_json}",
+            "https://data-api.binance.vision/api/v3/ticker/price",
+        ):
+            try:
+                r_bin = requests.get(b_url, timeout=5)
+                if r_bin.status_code == 200:
+                    data_b = r_bin.json()
+                    if isinstance(data_b, list):
+                        price_map = {str(item.get("symbol", "")).upper(): float(item.get("price", 0) or 0) for item in data_b}
+                        for c_up in pending_c:
+                            p_val = price_map.get(f"{c_up}USDT", 0.0)
+                            if p_val > 0:
+                                cotiz[c_up] = p_val
+                        break
+            except Exception:
+                pass
+
+        missing_c = [c for c in pending_c if c not in cotiz]
+        if missing_c:
+            cg_ids = [COINGECKO_ID_MAP[c] for c in missing_c if c in COINGECKO_ID_MAP]
+            if cg_ids:
+                try:
+                    r_cg = requests.get(
+                        "https://api.coingecko.com/api/v3/simple/price",
+                        params={"ids": ",".join(cg_ids), "vs_currencies": "usd"},
+                        timeout=6,
+                    )
+                    if r_cg.status_code == 200:
+                        cg_data = r_cg.json()
+                        for c_up in missing_c:
+                            cg_id = COINGECKO_ID_MAP.get(c_up)
+                            if cg_id and cg_id in cg_data and cg_data[cg_id].get("usd"):
+                                p_cg = float(cg_data[cg_id]["usd"])
+                                if p_cg > 0:
+                                    cotiz[c_up] = p_cg
+                except Exception:
+                    pass
+
+        for c_up in pending_c:
+            if c_up not in cotiz:
+                failed_syms.append(c_up)
+
+    # 3. Shares / ETFs via Yahoo Finance
+    headers = {"User-Agent": "Mozilla/5.0"}
+    for ticker in sorted({t.upper().strip().split(" ")[0] for t in list(simbolos_acciones) + list(simbolos_bonos) if t and t.strip()}):
+        if ticker in ("USD", "ARS", "AUD"):
+            continue
+        fetched = False
+        for yf_host in ("query1.finance.yahoo.com", "query2.finance.yahoo.com"):
+            try:
+                url_yf = f"https://{yf_host}/v8/finance/chart/{ticker}?interval=1d&range=1d"
+                r_yf = requests.get(url_yf, headers=headers, timeout=4)
+                if r_yf.status_code == 200:
+                    res = r_yf.json()["chart"]["result"][0]["meta"]
+                    precio_vivo = float(res.get("regularMarketPrice", 0) or 0)
+                    if precio_vivo > 0:
+                        cotiz[ticker] = precio_vivo
+                        fetched = True
+                        break
+            except Exception:
+                pass
+        if not fetched and ticker in simbolos_acciones:
+            failed_syms.append(ticker)
+
+    return {
+        "quotes": cotiz,
+        "failed_syms": failed_syms,
+        "fx_ok": fx_ok,
+        "updated_at": datetime.now(TZ_SYDNEY).strftime("%H:%M:%S"),
     }
 
-    try:
-        r_fx = requests.get("https://open.er-api.com/v6/latest/USD", timeout=4)
-        if r_fx.status_code == 200:
-            rate = r_fx.json().get("rates", {}).get("AUD")
-            if rate and float(rate) > 0:
-                cotiz["usd_to_aud"] = float(rate)
-    except Exception:
-        pass
 
-    lista_c = set(["BTC", "ETH", "SOL", "BNB"] + list(simbolos_cripto))
-    for cripto in lista_c:
-        c_up = cripto.upper().strip()
-        if not c_up:
-            continue
-        if c_up in ["USDT", "USDC", "DAI"]:
-            cotiz[c_up] = 1.0
-            continue
-        try:
-            par = f"{c_up}USDT"
-            url_bin = f"https://api.binance.com/api/v3/ticker/price?symbol={par}"
-            r_bin = requests.get(url_bin, timeout=3)
-            if r_bin.status_code == 200:
-                cotiz[c_up] = float(r_bin.json()["price"])
-        except Exception:
-            pass
+def obtener_cotizaciones(simbolos_acciones, simbolos_cripto, simbolos_bonos=()):
+    res = _fetch_live_quotes_uncached(tuple(simbolos_acciones), tuple(simbolos_cripto), tuple(simbolos_bonos))
+    live_q = dict(res.get("quotes", {}))
+    failed_syms = list(res.get("failed_syms", []))
+    fx_ok = bool(res.get("fx_ok", False))
 
-    headers = {"User-Agent": "Mozilla/5.0"}
-    for ticker in set(simbolos_acciones):
-        t_clean = ticker.upper().strip().split(" ")[0]
-        if not t_clean or t_clean in ["USD", "ARS", "AUD"]:
-            continue
-        try:
-            url_yf = f"https://query1.finance.yahoo.com/v8/finance/chart/{t_clean}?interval=1d&range=1d"
-            r_yf = requests.get(url_yf, headers=headers, timeout=3)
-            if r_yf.status_code == 200:
-                res = r_yf.json()["chart"]["result"][0]["meta"]
-                precio_vivo = float(res.get("regularMarketPrice", 0))
-                if precio_vivo > 0:
-                    cotiz[t_clean] = precio_vivo
-        except Exception:
-            pass
+    last_valid = st.session_state.setdefault("_last_valid_quotes", {})
+    # Update last_valid with any fresh live quotes
+    for k, v in live_q.items():
+        if v and float(v) > 0:
+            last_valid[k] = float(v)
 
-    return cotiz
+    # If FX or any symbol failed, retain last valid live price (never silent hardcoded fallback)
+    used_cached = []
+    if not fx_ok:
+        if "usd_to_aud" in last_valid:
+            live_q["usd_to_aud"] = last_valid["usd_to_aud"]
+            used_cached.append("USD/AUD")
+        else:
+            live_q["usd_to_aud"] = 1.53
+            used_cached.append("USD/AUD")
+
+    for sym in failed_syms:
+        if sym in last_valid:
+            live_q[sym] = last_valid[sym]
+            used_cached.append(sym)
+
+    st.session_state["_quotes_meta"] = {
+        "updated_at": res.get("updated_at", datetime.now(TZ_SYDNEY).strftime("%H:%M:%S")),
+        "failed_syms": failed_syms,
+        "used_cached": used_cached,
+        "fx_ok": fx_ok,
+    }
+    return live_q
 
 
 # ----------------- RESPONSIVE CSS STYLES (LAPTOP + MOBILE) -----------------
@@ -3335,12 +3541,16 @@ with st.sidebar:
             for ev in eventos_cal[:5]:
                 amt = ev["amount_aud"]
                 clean_title = _re_cp.sub(
-                    r'[+-]?\s*(?:AUD\s*)?\$\s*[0-9][0-9,]*(?:\.[0-9]{1,2})?',
+                    r'(?:[+-]\s*(?:AUD\s*)?\$?\s*[0-9][0-9,]*(?:\.[0-9]{1,2})?|(?:AUD\s*)?\$\s*[0-9][0-9,]*(?:\.[0-9]{1,2})?)',
                     '',
                     str(ev['title']),
                     flags=_re_cp.IGNORECASE,
                 ).strip(" -–·") or str(ev['title'])
-                urg_col = "#DC2626" if int(ev.get("days_left", 99)) <= 7 else "#4B5563"
+                days_left_i = int(ev.get("days_left", 99))
+                if days_left_i <= 7:
+                    urg_col = "#16A34A" if (amt is not None and amt > 0) else "#DC2626"
+                else:
+                    urg_col = "#4B5563"
                 if amt is not None:
                     amt_str = f"+${amt:,.0f}" if amt > 0 else f"-${abs(amt):,.0f}"
                     amt_html = f"<span style='color:{urg_col}; font-weight:700; white-space:nowrap;'>{amt_str}</span>"
@@ -4590,14 +4800,30 @@ with pestana1:
 # =========================================================================
 # ============================= TAB 2 =====================================
 # =========================================================================
-with pestana2:
+def _construir_patrimonio_vivo(datos):
     inversiones = datos.get("inversiones", [])
-    if reparar_inversiones_corruptas(inversiones):
-        guardar_datos(datos, registrar_cambio=False)
+    t_acc, t_cri, t_bon = [], [], []
+    for inv in inversiones:
+        tp = normalizar_tipo_activo_inv(inv.get("tipo", "Cash AUD"))
+        nom = str(inv.get("activo", tp)).strip()
+        sim = str(inv.get("simbolo", "")).upper().strip().split(" ")[0]
+        if tp in ["Cryptos", "Stocks", "Bonds"]:
+            det_t = nom.split(" ")[0].upper()
+            if det_t and det_t not in ["USD", "ARS", "AUD"]:
+                sim = det_t
+        if sim and sim not in ["USD", "ARS", "AUD"]:
+            if tp == "Stocks":
+                t_acc.append(sim)
+            elif tp == "Cryptos":
+                t_cri.append(sim)
+            elif tp == "Bonds":
+                t_bon.append(sim)
+    cotiz_live = obtener_cotizaciones(tuple(t_acc), tuple(t_cri), tuple(t_bon))
+    fx_live = float(cotiz_live.get("usd_to_aud", 1.53))
+    q_meta = st.session_state.get("_quotes_meta", {})
 
-    filas = []
-    advertencias_precios = []
-
+    filas_l = []
+    adv_l = []
     for inv in inversiones:
         cant = float(inv.get("cantidad", 0))
         tipo = normalizar_tipo_activo_inv(inv.get("tipo", "Cash AUD"))
@@ -4619,25 +4845,25 @@ with pestana2:
             val_aud = cant
             cotiz_actual_str = "1 AUD = 1.00 AUD"
         elif tipo == "Cash USD":
-            precio_unit_aud = usd_to_aud
-            val_aud = cant * usd_to_aud
-            cotiz_actual_str = f"1 USD = {usd_to_aud:,.2f} AUD"
+            precio_unit_aud = fx_live
+            val_aud = cant * fx_live
+            cotiz_actual_str = f"1 USD = {fx_live:,.2f} AUD"
         elif tipo in ["Cryptos", "Stocks"]:
-            precio_u_usd = cotizaciones.get(simbolo)
+            precio_u_usd = cotiz_live.get(simbolo)
             if precio_u_usd is None or float(precio_u_usd) <= 0:
                 precio_valido = False
                 precio_unit_aud = 0.0
                 val_aud = 0.0
                 cotiz_actual_str = f"⚠️ No quote for {simbolo}"
                 if esta_activo:
-                    advertencias_precios.append(f"{activo_nom} ({tipo})")
+                    adv_l.append(f"{activo_nom} ({tipo})")
             else:
-                precio_unit_aud = float(precio_u_usd) * usd_to_aud
+                precio_unit_aud = float(precio_u_usd) * fx_live
                 val_aud = cant * precio_unit_aud
                 cotiz_actual_str = f"1 {simbolo} = ${precio_unit_aud:,.2f} AUD"
         else:
-            if simbolo and simbolo not in ["AUD", "USD", "ARS"] and simbolo in cotizaciones and float(cotizaciones[simbolo]) > 0:
-                precio_unit_aud = float(cotizaciones[simbolo]) * usd_to_aud
+            if simbolo and simbolo not in ["AUD", "USD", "ARS"] and simbolo in cotiz_live and float(cotiz_live[simbolo]) > 0:
+                precio_unit_aud = float(cotiz_live[simbolo]) * fx_live
                 cotiz_actual_str = f"1 {simbolo} = ${precio_unit_aud:,.2f} AUD"
             else:
                 precio_unit_aud = float(inv.get("precio_unitario_aud", 1.0))
@@ -4646,12 +4872,12 @@ with pestana2:
                     precio_unit_aud = 0.0
                     cotiz_actual_str = "⚠️ Invalid price"
                     if esta_activo:
-                        advertencias_precios.append(f"{activo_nom} ({tipo})")
+                        adv_l.append(f"{activo_nom} ({tipo})")
                 else:
                     cotiz_actual_str = f"1 unit = ${precio_unit_aud:,.2f} AUD"
             val_aud = cant * precio_unit_aud if precio_valido else 0.0
 
-        filas.append({
+        filas_l.append({
             "Type": tipo,
             "Asset": activo_nom,
             "Symbol": simbolo,
@@ -4665,52 +4891,60 @@ with pestana2:
             "Active_Flag": esta_activo
         })
 
+    bn_k, bn_s, bn_ru, bn_rs = _obtener_binance_keys()
+    bn_err_msg = None
+    if bn_k and bn_s and bool(st.session_state.get("tab2_sync_binance_live", True)):
+        bn_rows, bn_err_msg = obtener_binance_portfolio(bn_k, bn_s, fx_live, relay_url=bn_ru, relay_secret=bn_rs)
+        if not bn_err_msg:
+            for b in bn_rows:
+                val_b = float(b.get("val_aud", 0.0) or 0.0)
+                if val_b < 2.0:
+                    continue
+                filas_l.append({
+                    "Type": "Cryptos",
+                    "Asset": f"{b['asset']} (Binance)",
+                    "Symbol": b["asset"],
+                    "Platform": b["wallet"],
+                    "Quantity_Num": float(b["qty"] or 0.0),
+                    "Quantity": formatear_cant(float(b["qty"] or 0.0)),
+                    "Price_Unit_AUD": float(b["price_aud"] or 0.0),
+                    "Price_Valid": float(b["price_aud"] or 0.0) > 0,
+                    "Live Quote": b["quote_str"],
+                    "Value (AUD)": val_b,
+                    "Active_Flag": True,
+                })
+
+    df_all = pd.DataFrame(filas_l)
+    if not df_all.empty:
+        df_all["Value (AUD)"] = pd.to_numeric(df_all["Value (AUD)"], errors="coerce").fillna(0.0)
+        df_act = df_all[
+            (df_all["Active_Flag"] == True)
+            & ~((df_all["Type"] == "Cryptos") & (df_all["Value (AUD)"] < 2.0))
+        ].copy()
+    else:
+        df_act = pd.DataFrame()
+    tot_aud = float(df_act["Value (AUD)"].sum()) if not df_act.empty else 0.0
+    return filas_l, df_all, df_act, tot_aud, adv_l, bn_err_msg, q_meta, cotiz_live, fx_live
+
+
+with pestana2:
+    inversiones = datos.get("inversiones", [])
+    if reparar_inversiones_corruptas(inversiones):
+        guardar_datos(datos, registrar_cambio=False)
+
     if "tab2_sync_binance_live" not in st.session_state:
         st.session_state["tab2_sync_binance_live"] = True
     bn_key, bn_sec, bn_r_url, bn_r_sec = _obtener_binance_keys()
-    if bn_key and bn_sec:
-        usar_binance_live = bool(st.session_state.get("tab2_sync_binance_live", True))
-        if usar_binance_live:
-            bn_rows, bn_err = obtener_binance_portfolio(bn_key, bn_sec, usd_to_aud, relay_url=bn_r_url, relay_secret=bn_r_sec)
-            if bn_err:
-                st.warning(f"⚠️ {bn_err}")
-            else:
-                for b in bn_rows:
-                    val_b = float(b.get("val_aud", 0.0) or 0.0)
-                    if val_b < 2.0:
-                        continue
-                    filas.append({
-                        "Type": "Cryptos",
-                        "Asset": f"{b['asset']} (Binance)",
-                        "Symbol": b["asset"],
-                        "Platform": b["wallet"],
-                        "Quantity_Num": float(b["qty"] or 0.0),
-                        "Quantity": formatear_cant(float(b["qty"] or 0.0)),
-                        "Price_Unit_AUD": float(b["price_aud"] or 0.0),
-                        "Price_Valid": float(b["price_aud"] or 0.0) > 0,
-                        "Live Quote": b["quote_str"],
-                        "Value (AUD)": val_b,
-                        "Active_Flag": True,
-                    })
 
+    filas, df_inv_todos, df_inv_activos, total_patrimonio_aud, advertencias_precios, _bn_err_init, _q_meta_init, _cotiz_init, _fx_init = _construir_patrimonio_vivo(datos)
+    if _bn_err_init:
+        st.warning(f"⚠️ {_bn_err_init}")
     if advertencias_precios:
         st.warning(
             "⚠️ No valid quote found for: "
             + ", ".join(advertencias_precios)
             + ". Excluded from total to avoid distorting Net Worth."
         )
-
-    df_inv_todos = pd.DataFrame(filas)
-    if not df_inv_todos.empty:
-        df_inv_todos["Value (AUD)"] = pd.to_numeric(df_inv_todos["Value (AUD)"], errors="coerce").fillna(0.0)
-        df_inv_activos = df_inv_todos[
-            (df_inv_todos["Active_Flag"] == True)
-            & ~((df_inv_todos["Type"] == "Cryptos") & (df_inv_todos["Value (AUD)"] < 2.0))
-        ].copy()
-    else:
-        df_inv_activos = pd.DataFrame()
-
-    total_patrimonio_aud = float(df_inv_activos["Value (AUD)"].sum()) if not df_inv_activos.empty else 0.0
 
 
 
@@ -5037,273 +5271,307 @@ with pestana2:
 
     # ---------------- MY ASSETS ----------------
     with col_inv_der:
-        st.markdown(
-            "<h3 style='color: var(--fin-ink);'>📋 My Assets by Category</h3>",
-            unsafe_allow_html=True
-        )
-        orden_categorias_inv = [
-            "Cash AUD",
-            "Cash USD",
-            "Stocks",
-            "Cryptos",
-            "Bonds",
-            "FCI",
-            "Others"
-        ]
+        _frag_dec = st.fragment(run_every=60) if hasattr(st, "fragment") else (lambda fn: fn)
 
-        if inversiones:
-            inv_cambios = False
-            for cat_inv in orden_categorias_inv:
-                items_cat_inv = [
-                    (idx, inv) for idx, inv in enumerate(inversiones)
-                    if normalizar_tipo_activo_inv(inv.get("tipo", "Others")) == cat_inv
-                ]
-                if not items_cat_inv:
-                    continue
-
-                sub_inv_aud = sum(
-                    filas[idx]["Value (AUD)"]
-                    for idx, inv in items_cat_inv
-                    if inv.get("activo_inv", True)
+        @_frag_dec
+        def _render_assets_y_breakdown():
+            _f_rows, _df_t, _df_a, _tot_aud, _adv_p, _bn_e, _qm, cotizaciones, usd_to_aud = _construir_patrimonio_vivo(datos)
+            _upd_lbl = _qm.get("updated_at", datetime.now(TZ_SYDNEY).strftime("%H:%M:%S"))
+            _c_hdr_l, _c_hdr_r = st.columns([3.0, 1.6])
+            with _c_hdr_l:
+                st.markdown(
+                    "<h3 style='color: var(--fin-ink); margin-bottom: 2px;'>📋 My Assets by Category</h3>",
+                    unsafe_allow_html=True
                 )
-
-                titulo_exp_inv = (
-                    f"📂 **{cat_inv}** — subt= "
-                    f"**${sub_inv_aud:,.2f} AUD**"
+            with _c_hdr_r:
+                st.markdown(
+                    f"<div style='text-align:right; font-size:0.80rem; color:var(--fin-muted); padding-top:12px;'>"
+                    f"🕒 Last updated: <b>{_upd_lbl}</b></div>",
+                    unsafe_allow_html=True,
                 )
-                with st.expander(titulo_exp_inv, expanded=True):
-                    hc1, hc2, hc3, hc4, hc5 = st.columns([0.45, 1.15, 1.85, 1.10, 0.45])
-                    hc1.markdown("<div class='col-header'>ACT.</div>", unsafe_allow_html=True)
-                    hc2.markdown("<div class='col-header'>DETAIL</div>", unsafe_allow_html=True)
-                    hc3.markdown("<div class='col-header'>QUANTITY</div>", unsafe_allow_html=True)
-                    hc4.markdown("<div class='col-header'>LOCATION</div>", unsafe_allow_html=True)
-                    hc5.markdown("<div class='col-header'>DEL</div>", unsafe_allow_html=True)
+            _failed_list = [s for s in (_qm.get("failed_syms") or [])]
+            if not _qm.get("fx_ok", True):
+                _failed_list.append("USD/AUD")
+            if _failed_list:
+                st.warning(
+                    "⚠️ Live quote refresh failed for: "
+                    + ", ".join(_failed_list)
+                    + ". Keeping last valid price."
+                )
+            orden_categorias_inv = [
+                "Cash AUD",
+                "Cash USD",
+                "Stocks",
+                "Cryptos",
+                "Bonds",
+                "FCI",
+                "Others"
+            ]
 
-                    for idx, inv in items_cat_inv:
-                        st_act = inv.get("activo_inv", True)
-                        c_chk, c_nom, c_cant, c_plat, c_del = st.columns([0.45, 1.15, 1.85, 1.10, 0.45])
+            if inversiones:
+                inv_cambios = False
+                for cat_inv in orden_categorias_inv:
+                    items_cat_inv = [
+                        (idx, inv) for idx, inv in enumerate(inversiones)
+                        if normalizar_tipo_activo_inv(inv.get("tipo", "Others")) == cat_inv
+                    ]
+                    if not items_cat_inv:
+                        continue
 
-                        with c_chk:
-                            nuevo_chk = st.checkbox(
-                                "Active",
-                                value=st_act,
-                                key=f"inv_chk_{idx}",
-                                label_visibility="collapsed"
-                            )
-                            if nuevo_chk != st_act:
-                                inv["activo_inv"] = nuevo_chk
-                                inv_cambios = True
+                    sub_inv_aud = sum(
+                        filas[idx]["Value (AUD)"]
+                        for idx, inv in items_cat_inv
+                        if inv.get("activo_inv", True)
+                    )
 
-                        with c_nom:
-                            st.text_input(
-                                "Detail",
-                                value=filas[idx]["Asset"],
-                                key=f"inv_nom_{idx}",
-                                label_visibility="collapsed",
-                                disabled=True
-                            )
+                    titulo_exp_inv = (
+                        f"📂 **{cat_inv}** — subt= "
+                        f"**${sub_inv_aud:,.2f} AUD**"
+                    )
+                    with st.expander(titulo_exp_inv, expanded=True):
+                        hc1, hc2, hc3, hc4, hc5 = st.columns([0.45, 1.15, 1.85, 1.10, 0.45])
+                        hc1.markdown("<div class='col-header'>ACT.</div>", unsafe_allow_html=True)
+                        hc2.markdown("<div class='col-header'>DETAIL</div>", unsafe_allow_html=True)
+                        hc3.markdown("<div class='col-header'>QUANTITY</div>", unsafe_allow_html=True)
+                        hc4.markdown("<div class='col-header'>LOCATION</div>", unsafe_allow_html=True)
+                        hc5.markdown("<div class='col-header'>DEL</div>", unsafe_allow_html=True)
 
-                        with c_cant:
-                            cant_num_actual = float(inv.get("cantidad", 0))
-                            cant_str_actual = formatear_cant(cant_num_actual)
-                            nueva_cant_str = st.text_input(
-                                "Quantity",
-                                value=cant_str_actual,
-                                key=f"inv_cant_{idx}",
-                                label_visibility="collapsed",
-                                disabled=not st_act
-                            )
-                            try:
-                                nueva_cant_val = parsear_numero_flexible(nueva_cant_str)
-                                if nueva_cant_val > 0 and abs(nueva_cant_val - cant_num_actual) > 1e-9:
-                                    inv["cantidad"] = int(nueva_cant_val) if nueva_cant_val.is_integer() else nueva_cant_val
-                                    cant_num_actual = nueva_cant_val
-                                    cant_str_actual = formatear_cant(cant_num_actual)
+                        for idx, inv in items_cat_inv:
+                            st_act = inv.get("activo_inv", True)
+                            c_chk, c_nom, c_cant, c_plat, c_del = st.columns([0.45, 1.15, 1.85, 1.10, 0.45])
+
+                            with c_chk:
+                                nuevo_chk = st.checkbox(
+                                    "Active",
+                                    value=st_act,
+                                    key=f"inv_chk_{idx}",
+                                    label_visibility="collapsed"
+                                )
+                                if nuevo_chk != st_act:
+                                    inv["activo_inv"] = nuevo_chk
                                     inv_cambios = True
-                            except ValueError:
-                                pass
 
-                            if cat_inv != "Cash AUD":
-                                if not filas[idx].get("Price_Valid", True):
-                                    st.markdown(
-                                        "<div style='font-size: 0.75rem; font-weight: 700; color: #991B1B; "
-                                        "background: #FEF2F2; border: 1px solid #FECACA; border-radius: 7px; "
-                                        "padding: 4px 7px; margin-top: -8px; margin-bottom: 6px; "
-                                        "white-space: normal; word-break: break-word; line-height: 1.25;'>"
-                                        "⚠️ Price invalid or unavailable"
-                                        "</div>",
-                                        unsafe_allow_html=True
-                                    )
-                                else:
-                                    precio_u_aud_fila = float(filas[idx]["Price_Unit_AUD"])
-                                    total_aud_fila = cant_num_actual * precio_u_aud_fila
-                                    precio_u_fmt = f"{precio_u_aud_fila:,.2f}"
-                                    st.markdown(
-                                        f"<div style='font-size: 0.75rem; font-weight: 700; color: #4A235A; "
-                                        f"background: #F5F3FF; border: 1px solid #DDD6FE; border-radius: 7px; "
-                                        f"padding: 4px 7px; margin-top: -8px; margin-bottom: 6px; "
-                                        f"white-space: normal; word-break: break-word; overflow-wrap: anywhere; "
-                                        f"line-height: 1.25;'>"
-                                        f"{cant_str_actual} × ${precio_u_fmt} = ${total_aud_fila:,.2f} AUD"
-                                        f"</div>",
-                                        unsafe_allow_html=True
-                                    )
+                            with c_nom:
+                                st.text_input(
+                                    "Detail",
+                                    value=filas[idx]["Asset"],
+                                    key=f"inv_nom_{idx}",
+                                    label_visibility="collapsed",
+                                    disabled=True
+                                )
 
-                        with c_plat:
-                            st.text_input(
-                                "Location",
-                                value=inv.get("plataforma", ""),
-                                key=f"inv_p_{idx}",
-                                label_visibility="collapsed",
-                                disabled=True
-                            )
+                            with c_cant:
+                                cant_num_actual = float(inv.get("cantidad", 0))
+                                cant_str_actual = formatear_cant(cant_num_actual)
+                                nueva_cant_str = st.text_input(
+                                    "Quantity",
+                                    value=cant_str_actual,
+                                    key=f"inv_cant_{idx}",
+                                    label_visibility="collapsed",
+                                    disabled=not st_act
+                                )
+                                try:
+                                    nueva_cant_val = parsear_numero_flexible(nueva_cant_str)
+                                    if nueva_cant_val > 0 and abs(nueva_cant_val - cant_num_actual) > 1e-9:
+                                        inv["cantidad"] = int(nueva_cant_val) if nueva_cant_val.is_integer() else nueva_cant_val
+                                        cant_num_actual = nueva_cant_val
+                                        cant_str_actual = formatear_cant(cant_num_actual)
+                                        inv_cambios = True
+                                except ValueError:
+                                    pass
 
-                        with c_del:
-                            if st.button("🗑️", key=f"inv_del_{idx}", help="Delete this asset"):
-                                datos["inversiones"].pop(idx)
-                                guardar_datos(datos)
-                                st.rerun()
+                                if cat_inv != "Cash AUD":
+                                    if not filas[idx].get("Price_Valid", True):
+                                        st.markdown(
+                                            "<div style='font-size: 0.75rem; font-weight: 700; color: #991B1B; "
+                                            "background: #FEF2F2; border: 1px solid #FECACA; border-radius: 7px; "
+                                            "padding: 4px 7px; margin-top: -8px; margin-bottom: 6px; "
+                                            "white-space: normal; word-break: break-word; line-height: 1.25;'>"
+                                            "⚠️ Price invalid or unavailable"
+                                            "</div>",
+                                            unsafe_allow_html=True
+                                        )
+                                    else:
+                                        precio_u_aud_fila = float(filas[idx]["Price_Unit_AUD"])
+                                        total_aud_fila = cant_num_actual * precio_u_aud_fila
+                                        precio_u_fmt = f"{precio_u_aud_fila:,.2f}"
+                                        st.markdown(
+                                            f"<div style='font-size: 0.75rem; font-weight: 700; color: #4A235A; "
+                                            f"background: #F5F3FF; border: 1px solid #DDD6FE; border-radius: 7px; "
+                                            f"padding: 4px 7px; margin-top: -8px; margin-bottom: 6px; "
+                                            f"white-space: normal; word-break: break-word; overflow-wrap: anywhere; "
+                                            f"line-height: 1.25;'>"
+                                            f"{cant_str_actual} × ${precio_u_fmt} = ${total_aud_fila:,.2f} AUD"
+                                            f"</div>",
+                                            unsafe_allow_html=True
+                                        )
 
-            if inv_cambios:
-                guardar_datos(datos)
-                st.rerun()
-        else:
-            st.info("No assets added yet.")
+                            with c_plat:
+                                st.text_input(
+                                    "Location",
+                                    value=inv.get("plataforma", ""),
+                                    key=f"inv_p_{idx}",
+                                    label_visibility="collapsed",
+                                    disabled=True
+                                )
+
+                            with c_del:
+                                if st.button("🗑️", key=f"inv_del_{idx}", help="Delete this asset"):
+                                    datos["inversiones"].pop(idx)
+                                    guardar_datos(datos)
+                                    st.rerun()
+
+                if inv_cambios:
+                    guardar_datos(datos)
+                    st.rerun()
+            else:
+                st.info("No assets added yet.")
+
+        _render_assets_y_breakdown()
 
     st.markdown("---")
 
-    st.markdown(
-        "<h3 style='color: var(--fin-ink);'>💼 Net Worth Breakdown</h3>",
-        unsafe_allow_html=True
-    )
-    if not df_inv_activos.empty and total_patrimonio_aud > 0:
-        col_g_inv1, col_g_inv2 = st.columns(2, gap="medium")
+    @_frag_dec
+    def _render_networth_breakdown():
+        _f_rows2, _df_t2, df_inv_activos, total_patrimonio_aud, _adv2, _bn_e2, _qm2, _c2, _fx2 = _construir_patrimonio_vivo(datos)
+        st.markdown(
+            f"<div style='display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:8px;'>"
+            f"<h3 style='color: var(--fin-ink); margin:0;'>💼 Net Worth Breakdown</h3>"
+            f"<span style='font-size:0.85rem; color:var(--fin-muted); font-weight:600;'>"
+            f"Total Net Worth: <b style='color:var(--fin-ink);'>${total_patrimonio_aud:,.2f} AUD</b> · Last updated: {_qm2.get('updated_at', '')}</span>"
+            f"</div>",
+            unsafe_allow_html=True
+        )
+        if not df_inv_activos.empty and total_patrimonio_aud > 0:
+            col_g_inv1, col_g_inv2 = st.columns(2, gap="medium")
 
-        with col_g_inv1:
-            st.markdown(
-                "<h4 style='color: var(--fin-ink); text-align: center;'>By Asset Type</h4>",
-                unsafe_allow_html=True
-            )
-            resumen_tipo = df_inv_activos.groupby("Type", as_index=False).agg({
-                "Value (AUD)": "sum"
-            }).sort_values(by="Value (AUD)", ascending=False)
-            resumen_tipo["%"] = (resumen_tipo["Value (AUD)"] / total_patrimonio_aud) * 100
-
-            fig_inv_tipo = crear_torta_2d(resumen_tipo, "Value (AUD)", "Type")
-            st.plotly_chart(fig_inv_tipo, use_container_width=True, config={"displayModeBar": False})
-
-            tabla_t = resumen_tipo.copy()
-            tabla_t.columns = ["Category", "Subtotal (AUD)", "%"]
-            tabla_t["Subtotal (AUD)"] = tabla_t["Subtotal (AUD)"].apply(lambda x: f"${x:,.2f} AUD")
-            tabla_t["%"] = tabla_t["%"].apply(lambda x: f"{x:.1f}%")
-            st.dataframe(tabla_t, use_container_width=True, hide_index=True)
-
-        with col_g_inv2:
-            st.markdown(
-                "<h4 style='color: var(--fin-ink); text-align: center;'>By Location</h4>",
-                unsafe_allow_html=True
-            )
-            df_det = df_inv_activos.sort_values(by="Value (AUD)", ascending=False).copy()
-            df_det["%"] = (df_det["Value (AUD)"] / total_patrimonio_aud) * 100
-
-            df_ubic_grp = df_inv_activos.copy()
-            df_ubic_grp["Ubicacion_Limpia"] = df_ubic_grp["Platform"].astype(str).str.strip()
-            df_ubic_grp.loc[df_ubic_grp["Ubicacion_Limpia"] == "", "Ubicacion_Limpia"] = "Unspecified"
-
-            mapa_ubic_display = {}
-            for u_raw in df_ubic_grp["Ubicacion_Limpia"]:
-                u_key = u_raw.lower()
-                if u_key not in mapa_ubic_display or (u_raw != u_raw.upper() and mapa_ubic_display[u_key] == mapa_ubic_display[u_key].upper()):
-                    mapa_ubic_display[u_key] = u_raw
-            df_ubic_grp["Ubicacion_Final"] = df_ubic_grp["Ubicacion_Limpia"].apply(lambda x: mapa_ubic_display.get(x.lower(), x))
-
-            resumen_ubic = df_ubic_grp.groupby("Ubicacion_Final", as_index=False).agg({
-                "Value (AUD)": "sum"
-            }).sort_values(by="Value (AUD)", ascending=False)
-            resumen_ubic["%"] = (resumen_ubic["Value (AUD)"] / total_patrimonio_aud) * 100
-
-            menores_2pct = resumen_ubic[resumen_ubic["%"] < 2.0]
-            if len(menores_2pct) > 1:
-                mayores_2pct = resumen_ubic[resumen_ubic["%"] >= 2.0].copy()
-                fila_otras = pd.DataFrame([{
-                    "Ubicacion_Final": "Other",
-                    "Value (AUD)": menores_2pct["Value (AUD)"].sum(),
-                    "%": menores_2pct["%"].sum()
-                }])
-                df_pie_ubic = pd.concat([mayores_2pct, fila_otras], ignore_index=True)
-            else:
-                df_pie_ubic = resumen_ubic.copy()
-
-            fig_inv_det = crear_torta_2d(df_pie_ubic, "Value (AUD)", "Ubicacion_Final")
-            st.plotly_chart(fig_inv_det, use_container_width=True, config={"displayModeBar": False})
-
-            activos_unicos = list(dict.fromkeys(df_det["Asset"].dropna().astype(str).tolist()))
-            ubicaciones_unicas = list(dict.fromkeys(df_det["Platform"].dropna().astype(str).tolist()))
-            opciones_filtro = ["All (show all)"]
-            for a_item in activos_unicos:
-                if a_item and a_item not in opciones_filtro:
-                    opciones_filtro.append(a_item)
-            for u_item in ubicaciones_unicas:
-                if u_item and u_item not in opciones_filtro:
-                    opciones_filtro.append(u_item)
-
-            filtro_sel = st.selectbox(
-                "🔎 Filter by Asset or Location (e.g. BTC, Up Bank, Binance):",
-                options=opciones_filtro,
-                key="filtro_tabla_final_inv"
-            )
-
-            if filtro_sel != "All (show all)":
-                f_low = filtro_sel.strip().lower()
-                mask_f = (
-                    (df_det["Asset"].astype(str).str.lower() == f_low)
-                    | (df_det["Symbol"].astype(str).str.lower() == f_low)
-                    | (df_det["Platform"].astype(str).str.lower() == f_low)
-                    | (df_det["Type"].astype(str).str.lower() == f_low)
+            with col_g_inv1:
+                st.markdown(
+                    "<h4 style='color: var(--fin-ink); text-align: center;'>By Asset Type</h4>",
+                    unsafe_allow_html=True
                 )
-                df_det_mostrar = df_det[mask_f].copy()
-            else:
-                df_det_mostrar = df_det.copy()
+                resumen_tipo = df_inv_activos.groupby("Type", as_index=False).agg({
+                    "Value (AUD)": "sum"
+                }).sort_values(by="Value (AUD)", ascending=False)
+                resumen_tipo["%"] = (resumen_tipo["Value (AUD)"] / total_patrimonio_aud) * 100
 
-            cols_d = [
-                "Type", "Asset", "Platform", "Quantity",
-                "Live Quote", "Value (AUD)", "%"
-            ]
-            tabla_d = df_det_mostrar[cols_d].copy()
-            tabla_d.columns = [
-                "Category", "Asset", "Location", "Quantity",
-                "Live Quote Used", "Value (AUD)", "%"
-            ]
-            tabla_d["Value (AUD)"] = tabla_d["Value (AUD)"].apply(lambda x: f"${x:,.2f} AUD")
-            tabla_d["%"] = tabla_d["%"].apply(lambda x: f"{x:.1f}%")
+                fig_inv_tipo = crear_torta_2d(resumen_tipo, "Value (AUD)", "Type")
+                st.plotly_chart(fig_inv_tipo, use_container_width=True, config={"displayModeBar": False})
 
-            if filtro_sel != "All (show all)" and not df_det_mostrar.empty:
-                sub_f_aud = df_det_mostrar["Value (AUD)"].sum()
-                sub_f_pct = (sub_f_aud / total_patrimonio_aud) * 100 if total_patrimonio_aud > 0 else 0.0
-                cant_f_total = df_det_mostrar["Quantity_Num"].sum()
-                es_mismo_activo = df_det_mostrar["Asset"].nunique() == 1
-                cant_f_str = formatear_cant(cant_f_total) if es_mismo_activo else f"{len(df_det_mostrar)} items"
+                tabla_t = resumen_tipo.copy()
+                tabla_t.columns = ["Category", "Subtotal (AUD)", "%"]
+                tabla_t["Subtotal (AUD)"] = tabla_t["Subtotal (AUD)"].apply(lambda x: f"${x:,.2f} AUD")
+                tabla_t["%"] = tabla_t["%"].apply(lambda x: f"{x:.1f}%")
+                st.dataframe(tabla_t, use_container_width=True, hide_index=True)
 
-                fila_subtotal = pd.DataFrame([{
-                    "Category": "SUBTOTAL",
-                    "Asset": filtro_sel,
-                    "Location": "Filtered total",
-                    "Quantity": cant_f_str,
-                    "Live Quote Used": "—",
-                    "Value (AUD)": f"${sub_f_aud:,.2f} AUD",
-                    "%": f"{sub_f_pct:.1f}%"
-                }])
-                tabla_d = pd.concat([tabla_d, fila_subtotal], ignore_index=True)
+            with col_g_inv2:
+                st.markdown(
+                    "<h4 style='color: var(--fin-ink); text-align: center;'>By Location</h4>",
+                    unsafe_allow_html=True
+                )
+                df_det = df_inv_activos.sort_values(by="Value (AUD)", ascending=False).copy()
+                df_det["%"] = (df_det["Value (AUD)"] / total_patrimonio_aud) * 100
 
-                st.markdown(f"""
-                <div style="background-color: #F3E8FF; border: 1.5px solid #C084FC; border-left: 6px solid #7E22CE;
-                            border-radius: 12px; padding: 10px 14px; margin-bottom: 10px; color: #4A235A; font-size: 0.98rem;">
-                    <b>Subtotal ({filtro_sel}):</b> <b>${sub_f_aud:,.2f} AUD</b> &nbsp;|&nbsp;
-                    <b>{sub_f_pct:.1f}%</b> of total net worth
-                </div>
-                """, unsafe_allow_html=True)
+                df_ubic_grp = df_inv_activos.copy()
+                df_ubic_grp["Ubicacion_Limpia"] = df_ubic_grp["Platform"].astype(str).str.strip()
+                df_ubic_grp.loc[df_ubic_grp["Ubicacion_Limpia"] == "", "Ubicacion_Limpia"] = "Unspecified"
 
-            st.dataframe(tabla_d, use_container_width=True, hide_index=True)
+                mapa_ubic_display = {}
+                for u_raw in df_ubic_grp["Ubicacion_Limpia"]:
+                    u_key = u_raw.lower()
+                    if u_key not in mapa_ubic_display or (u_raw != u_raw.upper() and mapa_ubic_display[u_key] == mapa_ubic_display[u_key].upper()):
+                        mapa_ubic_display[u_key] = u_raw
+                df_ubic_grp["Ubicacion_Final"] = df_ubic_grp["Ubicacion_Limpia"].apply(lambda x: mapa_ubic_display.get(x.lower(), x))
+
+                resumen_ubic = df_ubic_grp.groupby("Ubicacion_Final", as_index=False).agg({
+                    "Value (AUD)": "sum"
+                }).sort_values(by="Value (AUD)", ascending=False)
+                resumen_ubic["%"] = (resumen_ubic["Value (AUD)"] / total_patrimonio_aud) * 100
+
+                menores_2pct = resumen_ubic[resumen_ubic["%"] < 2.0]
+                if len(menores_2pct) > 1:
+                    mayores_2pct = resumen_ubic[resumen_ubic["%"] >= 2.0].copy()
+                    fila_otras = pd.DataFrame([{
+                        "Ubicacion_Final": "Other",
+                        "Value (AUD)": menores_2pct["Value (AUD)"].sum(),
+                        "%": menores_2pct["%"].sum()
+                    }])
+                    df_pie_ubic = pd.concat([mayores_2pct, fila_otras], ignore_index=True)
+                else:
+                    df_pie_ubic = resumen_ubic.copy()
+
+                fig_inv_det = crear_torta_2d(df_pie_ubic, "Value (AUD)", "Ubicacion_Final")
+                st.plotly_chart(fig_inv_det, use_container_width=True, config={"displayModeBar": False})
+
+                activos_unicos = list(dict.fromkeys(df_det["Asset"].dropna().astype(str).tolist()))
+                ubicaciones_unicas = list(dict.fromkeys(df_det["Platform"].dropna().astype(str).tolist()))
+                opciones_filtro = ["All (show all)"]
+                for a_item in activos_unicos:
+                    if a_item and a_item not in opciones_filtro:
+                        opciones_filtro.append(a_item)
+                for u_item in ubicaciones_unicas:
+                    if u_item and u_item not in opciones_filtro:
+                        opciones_filtro.append(u_item)
+
+                filtro_sel = st.selectbox(
+                    "🔎 Filter by Asset or Location (e.g. BTC, Up Bank, Binance):",
+                    options=opciones_filtro,
+                    key="filtro_tabla_final_inv"
+                )
+
+                if filtro_sel != "All (show all)":
+                    f_low = filtro_sel.strip().lower()
+                    mask_f = (
+                        (df_det["Asset"].astype(str).str.lower() == f_low)
+                        | (df_det["Symbol"].astype(str).str.lower() == f_low)
+                        | (df_det["Platform"].astype(str).str.lower() == f_low)
+                        | (df_det["Type"].astype(str).str.lower() == f_low)
+                    )
+                    df_det_mostrar = df_det[mask_f].copy()
+                else:
+                    df_det_mostrar = df_det.copy()
+
+                cols_d = [
+                    "Type", "Asset", "Platform", "Quantity",
+                    "Live Quote", "Value (AUD)", "%"
+                ]
+                tabla_d = df_det_mostrar[cols_d].copy()
+                tabla_d.columns = [
+                    "Category", "Asset", "Location", "Quantity",
+                    "Live Quote Used", "Value (AUD)", "%"
+                ]
+                tabla_d["Value (AUD)"] = tabla_d["Value (AUD)"].apply(lambda x: f"${x:,.2f} AUD")
+                tabla_d["%"] = tabla_d["%"].apply(lambda x: f"{x:.1f}%")
+
+                if filtro_sel != "All (show all)" and not df_det_mostrar.empty:
+                    sub_f_aud = df_det_mostrar["Value (AUD)"].sum()
+                    sub_f_pct = (sub_f_aud / total_patrimonio_aud) * 100 if total_patrimonio_aud > 0 else 0.0
+                    cant_f_total = df_det_mostrar["Quantity_Num"].sum()
+                    es_mismo_activo = df_det_mostrar["Asset"].nunique() == 1
+                    cant_f_str = formatear_cant(cant_f_total) if es_mismo_activo else f"{len(df_det_mostrar)} items"
+
+                    fila_subtotal = pd.DataFrame([{
+                        "Category": "SUBTOTAL",
+                        "Asset": filtro_sel,
+                        "Location": "Filtered total",
+                        "Quantity": cant_f_str,
+                        "Live Quote Used": "—",
+                        "Value (AUD)": f"${sub_f_aud:,.2f} AUD",
+                        "%": f"{sub_f_pct:.1f}%"
+                    }])
+                    tabla_d = pd.concat([tabla_d, fila_subtotal], ignore_index=True)
+
+                    st.markdown(f"""
+                    <div style="background-color: #F3E8FF; border: 1.5px solid #C084FC; border-left: 6px solid #7E22CE;
+                                border-radius: 12px; padding: 10px 14px; margin-bottom: 10px; color: #4A235A; font-size: 0.98rem;">
+                        <b>Subtotal ({filtro_sel}):</b> <b>${sub_f_aud:,.2f} AUD</b> &nbsp;|&nbsp;
+                        <b>{sub_f_pct:.1f}%</b> of total net worth
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                st.dataframe(tabla_d, use_container_width=True, hide_index=True)
+
+    _render_networth_breakdown()
 
     if bn_key and bn_sec:
         st.checkbox(
@@ -5352,17 +5620,80 @@ with pestana3:
         if "up_hide_internal" not in st.session_state:
             st.session_state["up_hide_internal"] = True
 
+        hoy_syd = datetime.now(TZ_SYDNEY).date()
+        if "up_range_mode" not in st.session_state:
+            st.session_state["up_range_mode"] = "All"
+        if "up_date_from" not in st.session_state:
+            st.session_state["up_date_from"] = hoy_syd - timedelta(days=90)
+        if "up_date_to" not in st.session_state:
+            st.session_state["up_date_to"] = hoy_syd
+
         ocultar_internas_up = st.checkbox(
             "Exclude internal Up transfers",
             help="Excludes transfers between your own Up Bank accounts so every external dollar in or out is counted accurately.",
             key="up_hide_internal",
         )
 
+        # Quick period buttons (shared by search averages & Top recurring costs)
+        _quick_opts = [
+            ("Last 7 days", 7),
+            ("30 days", 30),
+            ("90 days", 90),
+            ("6 months", 183),
+            ("This year", None),
+            ("All", None),
+        ]
+        _q_cols = st.columns(len(_quick_opts))
+        for _qi, (_qlbl, _qdays) in enumerate(_quick_opts):
+            with _q_cols[_qi]:
+                _is_act = st.session_state["up_range_mode"] == _qlbl
+                if st.button(
+                    _qlbl,
+                    key=f"up_qbtn_{_qi}",
+                    type="primary" if _is_act else "secondary",
+                    use_container_width=True,
+                ):
+                    st.session_state["up_range_mode"] = _qlbl
+                    st.session_state["up_date_to"] = hoy_syd
+                    if _qlbl == "This year":
+                        st.session_state["up_date_from"] = hoy_syd.replace(month=1, day=1)
+                    elif _qlbl == "All":
+                        st.session_state["up_date_from"] = hoy_syd - timedelta(days=365)
+                    elif _qdays is not None:
+                        st.session_state["up_date_from"] = hoy_syd - timedelta(days=_qdays - 1)
+                    st.rerun()
+
+        c_df1, c_df2 = st.columns(2)
+        with c_df1:
+            _sel_from = st.date_input(
+                "From",
+                value=st.session_state["up_date_from"],
+                format="DD/MM/YYYY",
+                key="up_inp_from",
+            )
+        with c_df2:
+            _sel_to = st.date_input(
+                "To",
+                value=st.session_state["up_date_to"],
+                format="DD/MM/YYYY",
+                key="up_inp_to",
+            )
+
+        if _sel_from != st.session_state["up_date_from"] or _sel_to != st.session_state["up_date_to"]:
+            st.session_state["up_date_from"] = _sel_from
+            st.session_state["up_date_to"] = _sel_to
+            st.session_state["up_range_mode"] = "Custom"
+
+        _modo_rng = st.session_state["up_range_mode"]
+        _d_from_use = None if _modo_rng == "All" else min(_sel_from, _sel_to)
+        _d_to_use = hoy_syd if _modo_rng == "All" else max(_sel_from, _sel_to)
+        _days_fetch = None if _modo_rng == "All" else max(30, (hoy_syd - _d_from_use).days + 3)
+
         cuentas_up, err_cuentas = obtener_cuentas_up_bank(
             up_token_activo, st.session_state["up_refresh_nonce"]
         )
         txs_raw, err_txs = obtener_transacciones_up_bank(
-            up_token_activo, 90, st.session_state["up_refresh_nonce"]
+            up_token_activo, _days_fetch, st.session_state["up_refresh_nonce"], max_pages=40
         )
 
         if err_cuentas or err_txs:
@@ -5391,21 +5722,124 @@ with pestana3:
                     )
 
                 f_txt = st.text_input("🔎 Search transactions", key="up_search_tx")
-                df_show = df_filtrado.copy()
-                if f_txt.strip():
-                    q_low = f_txt.strip().lower()
-                    df_show = df_show[
-                        df_show["Description"].str.lower().str.contains(q_low, na=False)
-                        | df_show["Note"].str.lower().str.contains(q_low, na=False)
-                        | df_show["Tag"].str.lower().str.contains(q_low, na=False)
-                    ]
-
-                df_show = df_show.sort_values("Date_Sort", ascending=False)
-                tabla_up = df_show[["Date", "Description", "Tag", "Status", "Note", "Amount (AUD)"]].copy()
-                tabla_up["Amount (AUD)"] = tabla_up["Amount (AUD)"].apply(
-                    lambda x: f"+${x:,.2f} AUD" if x >= 0 else f"-${abs(x):,.2f} AUD"
+                df_show, stats_up = calcular_resumen_cashflow_up(
+                    df_filtrado,
+                    date_from=_d_from_use,
+                    date_to=_d_to_use,
+                    search_text=f_txt,
+                    hoy_date=hoy_syd,
                 )
-                st.dataframe(tabla_up, use_container_width=True, hide_index=True)
+                df_period_all, stats_period_all = calcular_resumen_cashflow_up(
+                    df_filtrado,
+                    date_from=_d_from_use,
+                    date_to=_d_to_use,
+                    search_text="",
+                    hoy_date=hoy_syd,
+                )
+                st.session_state["up_live_cashflow_stats"] = {
+                    "search": f_txt.strip(),
+                    "stats": stats_up,
+                    "period_stats": stats_period_all,
+                }
+
+                def _fmt_signed_aud(v):
+                    return f"+${v:,.2f} AUD" if v >= 0 else f"-${abs(v):,.2f} AUD"
+
+                if f_txt.strip() or _modo_rng != "All":
+                    _tot_col = "#16A34A" if stats_up["total"] >= 0 else "#DC2626"
+                    _per_str = f"{stats_up['d_from'].strftime('%d/%m/%Y')} → {stats_up['d_to'].strftime('%d/%m/%Y')} ({stats_up['n_days']} days)"
+                    _sum_suffix = f' — "{f_txt.strip()}"' if f_txt.strip() else ''
+                    st.markdown(
+                        f"<div style='border:1px solid var(--fin-border-muted); border-radius:12px; padding:10px 14px; margin:8px 0 12px 0;'>"
+                        f"<div style='display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px; margin-bottom:8px;'>"
+                        f"<b style='color:var(--fin-ink); font-size:0.95rem;'>📊 Period Summary{_sum_suffix}</b>"
+                        f"<span style='color:var(--fin-muted); font-size:0.82rem;'>{_per_str}</span>"
+                        f"</div>"
+                        f"<div style='display:grid; grid-template-columns:repeat(auto-fit, minmax(120px, 1fr)); gap:8px; font-size:0.86rem;'>"
+                        f"<div><span style='color:var(--fin-muted);'>Transactions</span><br><b style='color:var(--fin-ink);'>{stats_up['count']}</b></div>"
+                        f"<div><span style='color:var(--fin-muted);'>Total</span><br><b style='color:{_tot_col};'>{_fmt_signed_aud(stats_up['total'])}</b></div>"
+                        f"<div><span style='color:var(--fin-muted);'>Avg / transaction</span><br><b style='color:var(--fin-ink);'>{_fmt_signed_aud(stats_up['avg_tx'])}</b></div>"
+                        f"<div><span style='color:var(--fin-muted);'>Avg / DAY</span><br><b style='color:var(--fin-ink);'>{_fmt_signed_aud(stats_up['avg_day'])}</b></div>"
+                        f"<div><span style='color:var(--fin-muted);'>Avg / WEEK</span><br><b style='color:var(--fin-ink);'>{_fmt_signed_aud(stats_up['avg_week'])}</b></div>"
+                        f"<div><span style='color:var(--fin-muted);'>Avg / MONTH</span><br><b style='color:var(--fin-ink);'>{_fmt_signed_aud(stats_up['avg_month'])}</b></div>"
+                        f"</div></div>",
+                        unsafe_allow_html=True,
+                    )
+
+                if not df_show.empty:
+                    df_show = df_show.sort_values("Date_Sort", ascending=False)
+                    tabla_up = df_show[["Date", "Description", "Tag", "Status", "Note", "Amount (AUD)"]].copy()
+                    tabla_up["Amount (AUD)"] = tabla_up["Amount (AUD)"].apply(
+                        lambda x: f"+${x:,.2f} AUD" if x >= 0 else f"-${abs(x):,.2f} AUD"
+                    )
+                    st.dataframe(tabla_up, use_container_width=True, hide_index=True)
+                else:
+                    st.info("No transactions match this search and date range.")
+
+                # ---------------- TOP RECURRING COSTS / INCOMES PER TAG ----------------
+                st.markdown("<div style='height:14px;'></div>", unsafe_allow_html=True)
+                st.markdown("<h3 style='color: var(--fin-ink); margin-bottom:4px;'>Top recurring costs</h3>", unsafe_allow_html=True)
+                _tag_mode = st.radio(
+                    "Recurring type",
+                    ["Costs", "Incomes"],
+                    horizontal=True,
+                    label_visibility="collapsed",
+                    key="up_top_tags_mode",
+                )
+                df_tags, tags_tot = calcular_top_tags_up(
+                    df_period_all,
+                    mode=_tag_mode,
+                    date_from=stats_period_all["d_from"],
+                    date_to=stats_period_all["d_to"],
+                    hoy_date=hoy_syd,
+                )
+                if df_tags.empty:
+                    st.info(f"No {_tag_mode.lower()} found in this period.")
+                else:
+                    _bar_col = "#DC2626" if _tag_mode == "Costs" else "#16A34A"
+                    _rows_html = []
+                    for _, _tr in df_tags.iterrows():
+                        _w_pct = max(2.0, min(100.0, float(_tr["Share_Pct"])))
+                        _rows_html.append(
+                            f"<tr style='border-bottom:1px solid var(--fin-border-muted);'>"
+                            f"<td style='padding:7px 8px; color:var(--fin-ink); font-weight:600; white-space:nowrap;'>{_tr['Tag']}</td>"
+                            f"<td style='padding:7px 8px; min-width:110px;'>"
+                            f"<div style='display:flex; align-items:center; gap:6px;'>"
+                            f"<div style='flex:1; height:8px; background:rgba(148,163,184,0.22); border-radius:999px; overflow:hidden;'>"
+                            f"<div style='width:{_w_pct:.1f}%; height:100%; background:{_bar_col}; border-radius:999px;'></div></div>"
+                            f"<span style='font-size:0.76rem; color:var(--fin-muted); min-width:38px; text-align:right;'>{_tr['Share_Pct']:.1f}%</span>"
+                            f"</div></td>"
+                            f"<td style='padding:7px 8px; text-align:right; color:var(--fin-ink); white-space:nowrap;'>${_tr['Total']:,.2f}</td>"
+                            f"<td style='padding:7px 8px; text-align:right; color:var(--fin-ink); white-space:nowrap;'>${_tr['Avg_Week']:,.2f}</td>"
+                            f"<td style='padding:7px 8px; text-align:right; color:var(--fin-ink); font-weight:700; white-space:nowrap;'>${_tr['Avg_Month']:,.2f}</td>"
+                            f"<td style='padding:7px 8px; text-align:right; color:var(--fin-muted);'>{int(_tr['Count'])}</td>"
+                            f"</tr>"
+                        )
+                    _tot_row_html = (
+                        f"<tr style='border-top:2px solid var(--fin-border-muted); font-weight:800;'>"
+                        f"<td style='padding:8px; color:var(--fin-ink);'>Total</td>"
+                        f"<td style='padding:8px; color:var(--fin-muted); font-size:0.78rem;'>100%</td>"
+                        f"<td style='padding:8px; text-align:right; color:{_bar_col}; white-space:nowrap;'>${tags_tot['total']:,.2f}</td>"
+                        f"<td style='padding:8px; text-align:right; color:{_bar_col}; white-space:nowrap;'>${tags_tot['avg_week']:,.2f}</td>"
+                        f"<td style='padding:8px; text-align:right; color:{_bar_col}; white-space:nowrap;'>${tags_tot['avg_month']:,.2f}</td>"
+                        f"<td style='padding:8px; text-align:right; color:var(--fin-ink);'>{tags_tot['count']}</td>"
+                        f"</tr>"
+                    )
+                    st.markdown(
+                        f"<div style='overflow-x:auto; border:1px solid var(--fin-border-muted); border-radius:12px; margin-top:6px;'>"
+                        f"<table style='width:100%; border-collapse:collapse; font-size:0.86rem;'>"
+                        f"<thead><tr style='border-bottom:1.5px solid var(--fin-border-muted); text-align:left;'>"
+                        f"<th style='padding:8px; color:var(--fin-muted);'>Tag</th>"
+                        f"<th style='padding:8px; color:var(--fin-muted);'>Share</th>"
+                        f"<th style='padding:8px; text-align:right; color:var(--fin-muted);'>Total (AUD)</th>"
+                        f"<th style='padding:8px; text-align:right; color:var(--fin-muted);'>Avg / Week</th>"
+                        f"<th style='padding:8px; text-align:right; color:var(--fin-muted);'>Avg / Month</th>"
+                        f"<th style='padding:8px; text-align:right; color:var(--fin-muted);'>Tx</th>"
+                        f"</tr></thead>"
+                        f"<tbody>{''.join(_rows_html)}{_tot_row_html}</tbody>"
+                        f"</table></div>",
+                        unsafe_allow_html=True,
+                    )
 
 
 # =========================================================================
@@ -5501,13 +5935,46 @@ with st.popover("💬 AI Advisor"):
                 resumen_ctx.append(
                     "Up Bank Accounts: " + "; ".join(f"{a['name']}: ${a['balance_aud']:,.2f} AUD" for a in cuentas_c)
                 )
-            txs_c, err_t = obtener_transacciones_up_bank(up_tok, 30, st.session_state.get("up_refresh_nonce", 0))
+            _cf_cached = st.session_state.get("up_live_cashflow_stats")
+            if _cf_cached and _cf_cached.get("search"):
+                _cs = _cf_cached["stats"]
+                resumen_ctx.append(
+                    f"Active Live Cash Flow Filter ('{_cf_cached['search']}', {_cs['d_from'].strftime('%d/%m/%Y')} to {_cs['d_to'].strftime('%d/%m/%Y')}, {_cs['n_days']}d): "
+                    f"tx={_cs['count']}, total=${_cs['total']:,.2f} AUD, avg_tx=${_cs['avg_tx']:,.2f}, "
+                    f"avg_day=${_cs['avg_day']:,.2f}, avg_week=${_cs['avg_week']:,.2f}, avg_month=${_cs['avg_month']:,.2f}"
+                )
+            txs_c, err_t = obtener_transacciones_up_bank(up_tok, 180, st.session_state.get("up_refresh_nonce", 0), max_pages=20)
             if txs_c and not err_t:
                 parsed_c = [clasificar_transaccion_up(t) for t in txs_c]
                 parsed_c = [p for p in parsed_c if not p["is_internal_up"]]
+                df_c_up = pd.DataFrame(parsed_c)
+                if not df_c_up.empty:
+                    hoy_c = datetime.now(TZ_SYDNEY).date()
+                    _, _all_s = calcular_resumen_cashflow_up(df_c_up, hoy_date=hoy_c)
+                    _n_days_c = max(1, _all_s["n_days"])
+                    _n_wks_c = _n_days_c / 7.0
+                    _n_mos_c = _n_days_c / 30.4375
+                    _by_desc = df_c_up.groupby("Description", as_index=False).agg(Total=("Amount (AUD)", "sum"), Count=("Amount (AUD)", "count"))
+                    _by_desc["Abs"] = _by_desc["Total"].abs()
+                    _top_payees = _by_desc.sort_values("Abs", ascending=False).head(15)
+                    resumen_ctx.append(
+                        f"Pre-calculated Payee Averages ({_all_s['d_from'].strftime('%d/%m/%Y')} to {_all_s['d_to'].strftime('%d/%m/%Y')}, {_n_days_c}d): "
+                        + "; ".join(
+                            f"{r['Description']}: total=${r['Total']:,.2f}, avg/mo=${r['Total']/_n_mos_c:,.2f}, avg/wk=${r['Total']/_n_wks_c:,.2f} ({int(r['Count'])} tx)"
+                            for _, r in _top_payees.iterrows()
+                        )
+                    )
+                    _top_tags_c, _ = calcular_top_tags_up(df_c_up, mode="Costs", date_from=_all_s["d_from"], date_to=_all_s["d_to"], hoy_date=hoy_c)
+                    if not _top_tags_c.empty:
+                        resumen_ctx.append(
+                            "Top Recurring Cost Tags: " + "; ".join(
+                                f"{r['Tag']}: total=${r['Total']:,.2f}, avg/mo=${r['Avg_Month']:,.2f}, avg/wk=${r['Avg_Week']:,.2f}"
+                                for _, r in _top_tags_c.head(10).iterrows()
+                            )
+                        )
                 resumen_ctx.append(
-                    "Recent Up Bank Transactions (last 30d, internal Up transfers excluded): "
-                    + "; ".join(f"{p['Date'][:10]} | {p['Description']} | {p['Tag']} | ${p['Amount (AUD)']:,.2f} AUD" for p in parsed_c[:45])
+                    "Latest 12 Up Bank Transactions: "
+                    + "; ".join(f"{p['Date']} | {p['Description']} | {p['Tag']} | ${p['Amount (AUD)']:,.2f}" for p in parsed_c[:12])
                 )
 
         gemini_k = _obtener_gemini_key()
