@@ -5620,80 +5620,17 @@ with pestana3:
         if "up_hide_internal" not in st.session_state:
             st.session_state["up_hide_internal"] = True
 
-        hoy_syd = datetime.now(TZ_SYDNEY).date()
-        if "up_range_mode" not in st.session_state:
-            st.session_state["up_range_mode"] = "All"
-        if "up_date_from" not in st.session_state:
-            st.session_state["up_date_from"] = hoy_syd - timedelta(days=90)
-        if "up_date_to" not in st.session_state:
-            st.session_state["up_date_to"] = hoy_syd
-
         ocultar_internas_up = st.checkbox(
             "Exclude internal Up transfers",
             help="Excludes transfers between your own Up Bank accounts so every external dollar in or out is counted accurately.",
             key="up_hide_internal",
         )
 
-        # Quick period buttons (shared by search averages & Top recurring costs)
-        _quick_opts = [
-            ("Last 7 days", 7),
-            ("30 days", 30),
-            ("90 days", 90),
-            ("6 months", 183),
-            ("This year", None),
-            ("All", None),
-        ]
-        _q_cols = st.columns(len(_quick_opts))
-        for _qi, (_qlbl, _qdays) in enumerate(_quick_opts):
-            with _q_cols[_qi]:
-                _is_act = st.session_state["up_range_mode"] == _qlbl
-                if st.button(
-                    _qlbl,
-                    key=f"up_qbtn_{_qi}",
-                    type="primary" if _is_act else "secondary",
-                    use_container_width=True,
-                ):
-                    st.session_state["up_range_mode"] = _qlbl
-                    st.session_state["up_date_to"] = hoy_syd
-                    if _qlbl == "This year":
-                        st.session_state["up_date_from"] = hoy_syd.replace(month=1, day=1)
-                    elif _qlbl == "All":
-                        st.session_state["up_date_from"] = hoy_syd - timedelta(days=365)
-                    elif _qdays is not None:
-                        st.session_state["up_date_from"] = hoy_syd - timedelta(days=_qdays - 1)
-                    st.rerun()
-
-        c_df1, c_df2 = st.columns(2)
-        with c_df1:
-            _sel_from = st.date_input(
-                "From",
-                value=st.session_state["up_date_from"],
-                format="DD/MM/YYYY",
-                key="up_inp_from",
-            )
-        with c_df2:
-            _sel_to = st.date_input(
-                "To",
-                value=st.session_state["up_date_to"],
-                format="DD/MM/YYYY",
-                key="up_inp_to",
-            )
-
-        if _sel_from != st.session_state["up_date_from"] or _sel_to != st.session_state["up_date_to"]:
-            st.session_state["up_date_from"] = _sel_from
-            st.session_state["up_date_to"] = _sel_to
-            st.session_state["up_range_mode"] = "Custom"
-
-        _modo_rng = st.session_state["up_range_mode"]
-        _d_from_use = None if _modo_rng == "All" else min(_sel_from, _sel_to)
-        _d_to_use = hoy_syd if _modo_rng == "All" else max(_sel_from, _sel_to)
-        _days_fetch = None if _modo_rng == "All" else max(30, (hoy_syd - _d_from_use).days + 3)
-
         cuentas_up, err_cuentas = obtener_cuentas_up_bank(
             up_token_activo, st.session_state["up_refresh_nonce"]
         )
         txs_raw, err_txs = obtener_transacciones_up_bank(
-            up_token_activo, _days_fetch, st.session_state["up_refresh_nonce"], max_pages=40
+            up_token_activo, 90, st.session_state["up_refresh_nonce"]
         )
 
         if err_cuentas or err_txs:
@@ -5722,124 +5659,21 @@ with pestana3:
                     )
 
                 f_txt = st.text_input("🔎 Search transactions", key="up_search_tx")
-                df_show, stats_up = calcular_resumen_cashflow_up(
-                    df_filtrado,
-                    date_from=_d_from_use,
-                    date_to=_d_to_use,
-                    search_text=f_txt,
-                    hoy_date=hoy_syd,
-                )
-                df_period_all, stats_period_all = calcular_resumen_cashflow_up(
-                    df_filtrado,
-                    date_from=_d_from_use,
-                    date_to=_d_to_use,
-                    search_text="",
-                    hoy_date=hoy_syd,
-                )
-                st.session_state["up_live_cashflow_stats"] = {
-                    "search": f_txt.strip(),
-                    "stats": stats_up,
-                    "period_stats": stats_period_all,
-                }
+                df_show = df_filtrado.copy()
+                if f_txt.strip():
+                    q_low = f_txt.strip().lower()
+                    df_show = df_show[
+                        df_show["Description"].str.lower().str.contains(q_low, na=False)
+                        | df_show["Note"].str.lower().str.contains(q_low, na=False)
+                        | df_show["Tag"].str.lower().str.contains(q_low, na=False)
+                    ]
 
-                def _fmt_signed_aud(v):
-                    return f"+${v:,.2f} AUD" if v >= 0 else f"-${abs(v):,.2f} AUD"
-
-                if f_txt.strip() or _modo_rng != "All":
-                    _tot_col = "#16A34A" if stats_up["total"] >= 0 else "#DC2626"
-                    _per_str = f"{stats_up['d_from'].strftime('%d/%m/%Y')} → {stats_up['d_to'].strftime('%d/%m/%Y')} ({stats_up['n_days']} days)"
-                    _sum_suffix = f' — "{f_txt.strip()}"' if f_txt.strip() else ''
-                    st.markdown(
-                        f"<div style='border:1px solid var(--fin-border-muted); border-radius:12px; padding:10px 14px; margin:8px 0 12px 0;'>"
-                        f"<div style='display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px; margin-bottom:8px;'>"
-                        f"<b style='color:var(--fin-ink); font-size:0.95rem;'>📊 Period Summary{_sum_suffix}</b>"
-                        f"<span style='color:var(--fin-muted); font-size:0.82rem;'>{_per_str}</span>"
-                        f"</div>"
-                        f"<div style='display:grid; grid-template-columns:repeat(auto-fit, minmax(120px, 1fr)); gap:8px; font-size:0.86rem;'>"
-                        f"<div><span style='color:var(--fin-muted);'>Transactions</span><br><b style='color:var(--fin-ink);'>{stats_up['count']}</b></div>"
-                        f"<div><span style='color:var(--fin-muted);'>Total</span><br><b style='color:{_tot_col};'>{_fmt_signed_aud(stats_up['total'])}</b></div>"
-                        f"<div><span style='color:var(--fin-muted);'>Avg / transaction</span><br><b style='color:var(--fin-ink);'>{_fmt_signed_aud(stats_up['avg_tx'])}</b></div>"
-                        f"<div><span style='color:var(--fin-muted);'>Avg / DAY</span><br><b style='color:var(--fin-ink);'>{_fmt_signed_aud(stats_up['avg_day'])}</b></div>"
-                        f"<div><span style='color:var(--fin-muted);'>Avg / WEEK</span><br><b style='color:var(--fin-ink);'>{_fmt_signed_aud(stats_up['avg_week'])}</b></div>"
-                        f"<div><span style='color:var(--fin-muted);'>Avg / MONTH</span><br><b style='color:var(--fin-ink);'>{_fmt_signed_aud(stats_up['avg_month'])}</b></div>"
-                        f"</div></div>",
-                        unsafe_allow_html=True,
-                    )
-
-                if not df_show.empty:
-                    df_show = df_show.sort_values("Date_Sort", ascending=False)
-                    tabla_up = df_show[["Date", "Description", "Tag", "Status", "Note", "Amount (AUD)"]].copy()
-                    tabla_up["Amount (AUD)"] = tabla_up["Amount (AUD)"].apply(
-                        lambda x: f"+${x:,.2f} AUD" if x >= 0 else f"-${abs(x):,.2f} AUD"
-                    )
-                    st.dataframe(tabla_up, use_container_width=True, hide_index=True)
-                else:
-                    st.info("No transactions match this search and date range.")
-
-                # ---------------- TOP RECURRING COSTS / INCOMES PER TAG ----------------
-                st.markdown("<div style='height:14px;'></div>", unsafe_allow_html=True)
-                st.markdown("<h3 style='color: var(--fin-ink); margin-bottom:4px;'>Top recurring costs</h3>", unsafe_allow_html=True)
-                _tag_mode = st.radio(
-                    "Recurring type",
-                    ["Costs", "Incomes"],
-                    horizontal=True,
-                    label_visibility="collapsed",
-                    key="up_top_tags_mode",
+                df_show = df_show.sort_values("Date_Sort", ascending=False)
+                tabla_up = df_show[["Date", "Description", "Tag", "Status", "Note", "Amount (AUD)"]].copy()
+                tabla_up["Amount (AUD)"] = tabla_up["Amount (AUD)"].apply(
+                    lambda x: f"+${x:,.2f} AUD" if x >= 0 else f"-${abs(x):,.2f} AUD"
                 )
-                df_tags, tags_tot = calcular_top_tags_up(
-                    df_period_all,
-                    mode=_tag_mode,
-                    date_from=stats_period_all["d_from"],
-                    date_to=stats_period_all["d_to"],
-                    hoy_date=hoy_syd,
-                )
-                if df_tags.empty:
-                    st.info(f"No {_tag_mode.lower()} found in this period.")
-                else:
-                    _bar_col = "#DC2626" if _tag_mode == "Costs" else "#16A34A"
-                    _rows_html = []
-                    for _, _tr in df_tags.iterrows():
-                        _w_pct = max(2.0, min(100.0, float(_tr["Share_Pct"])))
-                        _rows_html.append(
-                            f"<tr style='border-bottom:1px solid var(--fin-border-muted);'>"
-                            f"<td style='padding:7px 8px; color:var(--fin-ink); font-weight:600; white-space:nowrap;'>{_tr['Tag']}</td>"
-                            f"<td style='padding:7px 8px; min-width:110px;'>"
-                            f"<div style='display:flex; align-items:center; gap:6px;'>"
-                            f"<div style='flex:1; height:8px; background:rgba(148,163,184,0.22); border-radius:999px; overflow:hidden;'>"
-                            f"<div style='width:{_w_pct:.1f}%; height:100%; background:{_bar_col}; border-radius:999px;'></div></div>"
-                            f"<span style='font-size:0.76rem; color:var(--fin-muted); min-width:38px; text-align:right;'>{_tr['Share_Pct']:.1f}%</span>"
-                            f"</div></td>"
-                            f"<td style='padding:7px 8px; text-align:right; color:var(--fin-ink); white-space:nowrap;'>${_tr['Total']:,.2f}</td>"
-                            f"<td style='padding:7px 8px; text-align:right; color:var(--fin-ink); white-space:nowrap;'>${_tr['Avg_Week']:,.2f}</td>"
-                            f"<td style='padding:7px 8px; text-align:right; color:var(--fin-ink); font-weight:700; white-space:nowrap;'>${_tr['Avg_Month']:,.2f}</td>"
-                            f"<td style='padding:7px 8px; text-align:right; color:var(--fin-muted);'>{int(_tr['Count'])}</td>"
-                            f"</tr>"
-                        )
-                    _tot_row_html = (
-                        f"<tr style='border-top:2px solid var(--fin-border-muted); font-weight:800;'>"
-                        f"<td style='padding:8px; color:var(--fin-ink);'>Total</td>"
-                        f"<td style='padding:8px; color:var(--fin-muted); font-size:0.78rem;'>100%</td>"
-                        f"<td style='padding:8px; text-align:right; color:{_bar_col}; white-space:nowrap;'>${tags_tot['total']:,.2f}</td>"
-                        f"<td style='padding:8px; text-align:right; color:{_bar_col}; white-space:nowrap;'>${tags_tot['avg_week']:,.2f}</td>"
-                        f"<td style='padding:8px; text-align:right; color:{_bar_col}; white-space:nowrap;'>${tags_tot['avg_month']:,.2f}</td>"
-                        f"<td style='padding:8px; text-align:right; color:var(--fin-ink);'>{tags_tot['count']}</td>"
-                        f"</tr>"
-                    )
-                    st.markdown(
-                        f"<div style='overflow-x:auto; border:1px solid var(--fin-border-muted); border-radius:12px; margin-top:6px;'>"
-                        f"<table style='width:100%; border-collapse:collapse; font-size:0.86rem;'>"
-                        f"<thead><tr style='border-bottom:1.5px solid var(--fin-border-muted); text-align:left;'>"
-                        f"<th style='padding:8px; color:var(--fin-muted);'>Tag</th>"
-                        f"<th style='padding:8px; color:var(--fin-muted);'>Share</th>"
-                        f"<th style='padding:8px; text-align:right; color:var(--fin-muted);'>Total (AUD)</th>"
-                        f"<th style='padding:8px; text-align:right; color:var(--fin-muted);'>Avg / Week</th>"
-                        f"<th style='padding:8px; text-align:right; color:var(--fin-muted);'>Avg / Month</th>"
-                        f"<th style='padding:8px; text-align:right; color:var(--fin-muted);'>Tx</th>"
-                        f"</tr></thead>"
-                        f"<tbody>{''.join(_rows_html)}{_tot_row_html}</tbody>"
-                        f"</table></div>",
-                        unsafe_allow_html=True,
-                    )
+                st.dataframe(tabla_up, use_container_width=True, hide_index=True)
 
 
 # =========================================================================
